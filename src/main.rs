@@ -3,6 +3,7 @@ mod freeze;
 mod restore;
 mod thaw;
 use clap::{App, AppSettings, Arg, SubCommand};
+use std::process;
 
 pub struct Config {
     verbose: bool,
@@ -72,24 +73,29 @@ fn main() {
         )
         .get_matches();
 
-    let verbose = matches.is_present("verbose");
-    let quiet = matches.is_present("quiet");
+    let config = Config {
+        verbose: matches.is_present("verbose"),
+        quiet: matches.is_present("quiet"),
+    };
 
-    let config = Config { verbose, quiet };
-
-    match matches.subcommand() {
-        ("backup", Some(m)) => {
-            backup::perform_backup(config, m);
-        }
-        ("freeze", Some(m)) => {
-            freeze::perform_freeze(config, m);
-        }
-        ("restore", Some(m)) => {
-            restore::perform_restore(config, m);
-        }
-        ("thaw", Some(m)) => {
-            thaw::perform_thaw(config, m);
-        }
-        _ => unreachable!(),
-    }
+    process::exit(
+        match match matches.subcommand() {
+            ("backup", Some(m)) => backup::perform_backup(config, m),
+            ("freeze", Some(m)) => freeze::perform_freeze(config, m),
+            ("restore", Some(m)) => restore::perform_restore(config, m),
+            ("thaw", Some(m)) => thaw::perform_thaw(config, m),
+            _ => unreachable!(),
+        } {
+            Ok(_) => 0,
+            Err(err) => {
+                if let Some(raw_os_error) = err.raw_os_error() {
+                    eprintln!("Raw OS error: {}", err);
+                    raw_os_error
+                } else {
+                    eprintln!("Generic error: {:?}", err);
+                    1
+                }
+            }
+        },
+    );
 }

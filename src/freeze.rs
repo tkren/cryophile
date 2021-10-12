@@ -1,6 +1,7 @@
 use crate::Config;
+use std::io;
 
-pub fn perform_freeze(config: Config, matches: &clap::ArgMatches) {
+pub fn perform_freeze(config: Config, matches: &clap::ArgMatches) -> io::Result<()> {
     println!("FREEZE...");
     if config.verbose {
         println!("Printing verbose info...");
@@ -12,4 +13,5 @@ pub fn perform_freeze(config: Config, matches: &clap::ArgMatches) {
     if debug {
         println!("We debug");
     }
+    Ok(())
 }
