@@ -1,14 +1,5 @@
-mod backup;
-mod freeze;
-mod restore;
-mod thaw;
 use clap::{App, AppSettings, Arg, SubCommand};
 use std::process;
-
-pub struct Config {
-    verbose: bool,
-    quiet: bool,
-}
 
 fn main() {
     let matches = App::new("Permafrust")
@@ -73,29 +64,11 @@ fn main() {
         )
         .get_matches();
 
-    let config = Config {
-        verbose: matches.is_present("verbose"),
-        quiet: matches.is_present("quiet"),
-    };
+    let config = permafrust::Config::new(&matches);
 
-    process::exit(
-        match match matches.subcommand() {
-            ("backup", Some(m)) => backup::perform_backup(config, m),
-            ("freeze", Some(m)) => freeze::perform_freeze(config, m),
-            ("restore", Some(m)) => restore::perform_restore(config, m),
-            ("thaw", Some(m)) => thaw::perform_thaw(config, m),
-            _ => unreachable!(),
-        } {
-            Ok(_) => 0,
-            Err(err) => {
-                if let Some(raw_os_error) = err.raw_os_error() {
-                    eprintln!("Raw OS error: {}", err);
-                    raw_os_error
-                } else {
-                    eprintln!("Generic error: {:?}", err);
-                    1
-                }
-            }
-        },
-    );
+    if let Err(err) = permafrust::run(config, &matches) {
+        let permafrust::CliError::IoError(e, code) = err;
+        eprintln!("IO Error: {}", e);
+        process::exit(code);
+    }
 }
