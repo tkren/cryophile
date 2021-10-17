@@ -1,8 +1,10 @@
 mod backup;
 mod freeze;
 mod restore;
+mod split;
 mod thaw;
 
+pub use split::Split;
 use std::fmt;
 use std::io;
 
