@@ -12,7 +12,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new<'a>(matches: &'a clap::ArgMatches) -> Config {
+    pub fn new<'a>(matches: &'a clap::ArgMatches) -> Self {
         Config {
             verbose: matches.is_present("verbose"),
             quiet: matches.is_present("quiet"),
