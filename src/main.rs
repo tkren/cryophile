@@ -17,6 +17,28 @@ fn main() {
                         .long("input")
                         .takes_value(true)
                         .help("input file (default: stdin)"),
+                )
+                .arg(
+                    Arg::with_name("base")
+                        .short("b")
+                        .long("base")
+                        .takes_value(true)
+                        .help("base directory"),
+                )
+                .arg(
+                    Arg::with_name("vault")
+                        .short("v")
+                        .long("vault")
+                        .takes_value(true)
+                        .help("vault directory (under base directory)"),
+                )
+                .arg(
+                    Arg::with_name("output")
+                        .short("o")
+                        .long("output")
+                        .takes_value(true)
+                        .required(true)
+                        .help("output directory (under vault directory)"),
                 ),
         )
         .subcommand(
