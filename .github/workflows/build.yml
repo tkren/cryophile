@@ -1,0 +1,33 @@
+name: permafrust build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: sudo apt-get install nettle-dev
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@v1
+
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+
+      - name: cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
