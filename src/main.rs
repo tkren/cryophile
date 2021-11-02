@@ -89,8 +89,17 @@ fn main() {
     let config = permafrust::Config::new(&matches);
 
     if let Err(err) = permafrust::run(config, &matches) {
-        let permafrust::CliError::IoError(e, code) = err;
-        eprintln!("IO Error: {}", e);
+        let code = match err {
+            permafrust::CliError::IoError(ref e, code) => {
+                log::error!("I/O Error: {}", e);
+                code
+            }
+            permafrust::CliError::LogError(ref e, code) => {
+                log::error!("Log Error: {}", e);
+                code
+            }
+        };
+
         process::exit(code);
     }
 }

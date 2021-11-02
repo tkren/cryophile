@@ -4,22 +4,22 @@ use std::io;
 use std::io::Read;
 
 pub fn perform_backup(config: Config, matches: &clap::ArgMatches) -> io::Result<()> {
-    println!("BACKUP...");
+    log::info!("BACKUP...");
     if config.verbose {
-        println!("Printing verbose info...");
+        log::debug!("Printing verbose info...");
     } else if !config.quiet {
-        println!("Printing normally...");
+        log::debug!("Printing normally...");
     }
 
     let input = matches.value_of("input").unwrap_or("-");
 
     let reader: Box<dyn io::Read> = match input {
         "-" => {
-            println!("Reading from stdin ...");
+            log::info!("Reading from stdin ...");
             Box::new(io::stdin())
         }
         _ => {
-            println!("Opening `{}' ...", input);
+            log::info!("Opening `{}' ...", input);
             Box::new(fs::File::open(input)?)
         }
     };

@@ -2,14 +2,14 @@ use crate::Config;
 use std::io;
 
 pub fn perform_restore(config: Config, matches: &clap::ArgMatches) -> io::Result<()> {
-    println!("RESTORE...");
+    log::info!("RESTORE...");
     if config.verbose {
-        println!("Printing verbose info...");
+        log::debug!("Printing verbose info...");
     } else if !config.quiet {
-        println!("Printing normally...");
+        log::debug!("Printing normally...");
     }
 
     let output = matches.value_of("output").unwrap_or("-");
-    println!("The output file passed is: {}", output);
+    log::info!("The output file passed is: {}", output);
     Ok(())
 }

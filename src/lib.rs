@@ -4,6 +4,7 @@ mod restore;
 mod split;
 mod thaw;
 
+pub use encoder::FinalEncoder;
 pub use split::Split;
 use std::fmt;
 use std::io;
@@ -24,6 +25,7 @@ impl Config {
 
 pub enum CliError {
     IoError(io::Error, i32),
+    LogError(log::SetLoggerError, i32),
 }
 
 impl From<io::Error> for CliError {
@@ -35,15 +37,27 @@ impl From<io::Error> for CliError {
     }
 }
 
+impl From<log::SetLoggerError> for CliError {
+    fn from(error: log::SetLoggerError) -> Self {
+        CliError::LogError(error, 1)
+    }
+}
+
 impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CliError::IoError(error, code) => write!(f, "{} ({})", error, code),
+            CliError::LogError(_error, _code) => write!(f, "Cannot call set_logger more than once"),
         }
     }
 }
 
 pub fn run<'a>(config: Config, matches: &'a clap::ArgMatches) -> Result<(), CliError> {
+    let env = env_logger::Env::new()
+        .filter("PERMAFRUST_LOG")
+        .write_style("PERMAFRUST_LOG_STYLE");
+    env_logger::try_init_from_env(env)?;
+
     match matches.subcommand() {
         ("backup", Some(m)) => backup::perform_backup(config, m)?,
         ("freeze", Some(m)) => freeze::perform_freeze(config, m)?,
