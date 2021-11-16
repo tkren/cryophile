@@ -7,20 +7,14 @@ mod thaw;
 pub use encoder::FinalEncoder;
 pub use split::Split;
 use std::fmt;
+use std::fs;
 use std::io;
+use std::path::PathBuf;
 
 pub struct Config {
+    pub base: PathBuf,
     pub verbose: bool,
     pub quiet: bool,
-}
-
-impl Config {
-    pub fn new<'a>(matches: &'a clap::ArgMatches) -> Self {
-        Config {
-            verbose: matches.is_present("verbose"),
-            quiet: matches.is_present("quiet"),
-        }
-    }
 }
 
 pub enum CliError {
@@ -52,12 +46,45 @@ impl fmt::Display for CliError {
     }
 }
 
-pub fn run<'a>(config: Config, matches: &'a clap::ArgMatches) -> Result<(), CliError> {
+fn use_base_dir(base: &str) -> io::Result<PathBuf> {
+    match fs::metadata(base) {
+        Err(err) => {
+            return Err(io::Error::new(
+                err.kind(),
+                format!("Base {} does not exist", base),
+            ));
+        }
+        Ok(metadata) => {
+            if !metadata.is_dir() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("Base {} is not an existing directory", base),
+                ));
+            }
+            Ok(PathBuf::from(base))
+        }
+    }
+}
+
+pub fn run<'a>(matches: &'a clap::ArgMatches) -> Result<(), CliError> {
+    // setup logger using environment
     let env = env_logger::Env::new()
         .filter("PERMAFRUST_LOG")
         .write_style("PERMAFRUST_LOG_STYLE");
     env_logger::try_init_from_env(env)?;
 
+    // parse global arguments and create Config
+    let base_path = matches.value_of("base").unwrap_or("/tmp");
+    let base_pathbuf: PathBuf = use_base_dir(base_path)?;
+    log::trace!("Using base directory {:?}", base_path);
+
+    let config = Config {
+        base: base_pathbuf,
+        verbose: matches.is_present("verbose"),
+        quiet: matches.is_present("quiet"),
+    };
+
+    // perform requested subcommand
     match matches.subcommand() {
         ("backup", Some(m)) => backup::perform_backup(config, m)?,
         ("freeze", Some(m)) => freeze::perform_freeze(config, m)?,

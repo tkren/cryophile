@@ -19,13 +19,6 @@ fn main() {
                         .help("input file (default: stdin)"),
                 )
                 .arg(
-                    Arg::with_name("base")
-                        .short("b")
-                        .long("base")
-                        .takes_value(true)
-                        .help("base directory"),
-                )
-                .arg(
                     Arg::with_name("vault")
                         .short("v")
                         .long("vault")
@@ -84,11 +77,16 @@ fn main() {
                 .long("quiet")
                 .help("Quiet mode"),
         )
+        .arg(
+            Arg::with_name("base")
+                .short("b")
+                .long("base")
+                .takes_value(true)
+                .help("Base directory"),
+        )
         .get_matches();
 
-    let config = permafrust::Config::new(&matches);
-
-    if let Err(err) = permafrust::run(config, &matches) {
+    if let Err(err) = permafrust::run(&matches) {
         let code = match err {
             permafrust::CliError::IoError(ref e, code) => {
                 log::error!("I/O Error: {}", e);
