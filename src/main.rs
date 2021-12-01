@@ -1,10 +1,11 @@
 use clap::{App, AppSettings, Arg, SubCommand};
+use permafrust::constants::{DEFAULT_COMPRESSION, VERSION};
 use std::process;
 
 fn main() {
     let matches = App::new("Permafrust")
         .setting(AppSettings::ArgRequiredElseHelp)
-        .version("0.1.0")
+        .version(env!("CARGO_PKG_VERSION"))
         .author("Thomas Krennwallner <tk@postsubmeta.net>")
         .about("Glacier backup")
         .long_about("A backup and restore tool for AWS Glacier")
@@ -23,7 +24,7 @@ fn main() {
                         .short("v")
                         .long("vault")
                         .takes_value(true)
-                        .help("vault directory (under base directory)"),
+                        .help("vault directory (under spool directory)"),
                 )
                 .arg(
                     Arg::with_name("output")
@@ -32,6 +33,15 @@ fn main() {
                         .takes_value(true)
                         .required(true)
                         .help("output directory (under vault directory)"),
+                )
+                .arg(
+                    Arg::with_name("compression")
+                        .short("C")
+                        .long("compression")
+                        .takes_value(true)
+                        .required(false)
+                        .default_value(DEFAULT_COMPRESSION.into())
+                        .help("compress output using a supported algorithm (lz4, none, zstd)"),
                 ),
         )
         .subcommand(
