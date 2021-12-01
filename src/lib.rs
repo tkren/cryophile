@@ -1,5 +1,6 @@
 mod backup;
 pub mod constants;
+pub mod encoder;
 mod freeze;
 mod restore;
 mod split;
