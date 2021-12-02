@@ -8,18 +8,21 @@ mod thaw;
 
 pub use encoder::FinalEncoder;
 pub use split::Split;
+use std::env;
 use std::fmt;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 
 pub struct Config {
-    pub base: PathBuf,
+    pub base: xdg::BaseDirectories,
     pub verbose: bool,
     pub quiet: bool,
 }
 
 pub enum CliError {
+    BaseDirError(xdg::BaseDirectoriesError, i32),
+    EnvError(env::VarError, i32),
     IoError(io::Error, i32),
     LogError(log::SetLoggerError, i32),
 }
@@ -42,33 +45,64 @@ impl From<log::SetLoggerError> for CliError {
 impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            CliError::BaseDirError(error, code) => write!(f, "{} ({})", error, code),
+            CliError::EnvError(error, code) => write!(f, "{} ({})", error, code),
             CliError::IoError(error, code) => write!(f, "{} ({})", error, code),
             CliError::LogError(_error, _code) => write!(f, "Cannot call set_logger more than once"),
         }
     }
 }
 
-fn use_base_dir(base: &str) -> io::Result<PathBuf> {
-    match fs::metadata(base) {
-        Err(err) => {
-            return Err(io::Error::new(
-                err.kind(),
-                format!("Base {} does not exist", base),
-            ));
+impl fmt::Debug for CliError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BaseDirError(error, code) => f
+                .debug_tuple("BaseDirError")
+                .field(error)
+                .field(code)
+                .finish(),
+            Self::EnvError(error, code) => {
+                f.debug_tuple("EnvError").field(error).field(code).finish()
+            }
+            Self::IoError(error, code) => {
+                f.debug_tuple("IoError").field(error).field(code).finish()
+            }
+            Self::LogError(error, code) => {
+                f.debug_tuple("LogError").field(error).field(code).finish()
+            }
+        }
+    }
+}
+
+fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
+    let state_home = base.get_state_home();
+    match fs::metadata(&state_home) {
+        Err(_err) => {
+            match base.create_state_directory("") {
+                Ok(state_path) => Ok(state_path),
+                Err(err) => Err(err),
+            }
         }
         Ok(metadata) => {
             if !metadata.is_dir() {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    format!("Base {} is not an existing directory", base),
+                    format!("Base {} is not an existing directory", state_home.to_string_lossy()),
                 ));
             }
-            Ok(PathBuf::from(base))
+            Ok(state_home)
         }
     }
 }
 
-pub fn run<'a>(matches: &'a clap::ArgMatches) -> Result<(), CliError> {
+pub fn base_directory_profile(subcommand: &str) -> Result<xdg::BaseDirectories, CliError> {
+    match xdg::BaseDirectories::with_profile(env!("CARGO_PKG_NAME"), subcommand) {
+        Ok(base_dirs) => Ok(base_dirs),
+        Err(err) => Err(CliError::BaseDirError(err, 1)),
+    }
+}
+
+pub fn run<'a>(config: Config, matches: &'a clap::ArgMatches) -> Result<(), CliError> {
     // setup logger using environment
     let env = env_logger::Env::new()
         .filter("PERMAFRUST_LOG")
@@ -76,15 +110,8 @@ pub fn run<'a>(matches: &'a clap::ArgMatches) -> Result<(), CliError> {
     env_logger::try_init_from_env(env)?;
 
     // parse global arguments and create Config
-    let base_path = matches.value_of("base").unwrap_or("/tmp");
-    let base_pathbuf: PathBuf = use_base_dir(base_path)?;
-    log::trace!("Using base directory {:?}", base_path);
-
-    let config = Config {
-        base: base_pathbuf,
-        verbose: matches.is_present("verbose"),
-        quiet: matches.is_present("quiet"),
-    };
+    let base_pathbuf: PathBuf = use_base_dir(&config.base)?;
+    log::trace!("Using base directory {:?}", base_pathbuf);
 
     // perform requested subcommand
     match matches.subcommand() {

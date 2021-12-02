@@ -1,8 +1,12 @@
 use clap::{App, AppSettings, Arg, SubCommand};
-use permafrust::constants::{DEFAULT_COMPRESSION, VERSION};
+use permafrust::{constants::DEFAULT_COMPRESSION, default_base_dir};
 use std::process;
 
 fn main() {
+    let base_directories = default_base_dir().unwrap();
+    let state_home = base_directories.get_state_home();
+    let base_dir = state_home.to_str().unwrap();
+
     let matches = App::new("Permafrust")
         .setting(AppSettings::ArgRequiredElseHelp)
         .version(env!("CARGO_PKG_VERSION"))
@@ -92,12 +96,28 @@ fn main() {
                 .short("b")
                 .long("base")
                 .takes_value(true)
-                .help("Base directory"),
+                .default_value(base_dir)
+                .help("Base directory containing all backup and restore state"),
         )
         .get_matches();
 
-    if let Err(err) = permafrust::run(&matches) {
+
+    let config = permafrust::Config {
+        base: base_directories,
+        verbose: matches.is_present("verbose"),
+        quiet: matches.is_present("quiet"),
+    };
+
+    if let Err(err) = permafrust::run(config, &matches) {
         let code = match err {
+            permafrust::CliError::BaseDirError(ref e, code) => {
+                log::error!("BaseDirectory Error: {}", e);
+                code
+            }
+            permafrust::CliError::EnvError(ref e, code) => {
+                log::error!("Environment Error: {}", e);
+                code
+            }
             permafrust::CliError::IoError(ref e, code) => {
                 log::error!("I/O Error: {}", e);
                 code
