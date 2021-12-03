@@ -1,13 +1,9 @@
 use clap::{App, AppSettings, Arg, SubCommand};
-use permafrust::{constants::DEFAULT_COMPRESSION, default_base_dir};
+use permafrust::{base_directory_profile, constants::DEFAULT_COMPRESSION};
 use std::process;
 
 fn main() {
-    let base_directories = default_base_dir().unwrap();
-    let state_home = base_directories.get_state_home();
-    let base_dir = state_home.to_str().unwrap();
-
-    let matches = App::new("Permafrust")
+    let matches = App::new(env!("CARGO_PKG_NAME"))
         .setting(AppSettings::ArgRequiredElseHelp)
         .version(env!("CARGO_PKG_VERSION"))
         .author("Thomas Krennwallner <tk@postsubmeta.net>")
@@ -96,11 +92,16 @@ fn main() {
                 .short("b")
                 .long("base")
                 .takes_value(true)
-                .default_value(base_dir)
                 .help("Base directory containing all backup and restore state"),
         )
         .get_matches();
 
+    let (subcommand, submatches) = match matches.subcommand() {
+        (sc, Some(m)) => (sc, m),
+        _ => unreachable!(),
+    };
+
+    let base_directories = base_directory_profile(subcommand).unwrap();
 
     let config = permafrust::Config {
         base: base_directories,
@@ -108,7 +109,7 @@ fn main() {
         quiet: matches.is_present("quiet"),
     };
 
-    if let Err(err) = permafrust::run(config, &matches) {
+    if let Err(err) = permafrust::run(config, subcommand, submatches) {
         let code = match err {
             permafrust::CliError::BaseDirError(ref e, code) => {
                 log::error!("BaseDirectory Error: {}", e);

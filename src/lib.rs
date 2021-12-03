@@ -78,6 +78,7 @@ fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
     let state_home = base.get_state_home();
     match fs::metadata(&state_home) {
         Err(_err) => {
+            log::info!("Creating state directory {:?}", state_home);
             match base.create_state_directory("") {
                 Ok(state_path) => Ok(state_path),
                 Err(err) => Err(err),
@@ -87,7 +88,10 @@ fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
             if !metadata.is_dir() {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    format!("Base {} is not an existing directory", state_home.to_string_lossy()),
+                    format!(
+                        "Base state home {:?} is not an existing directory",
+                        state_home
+                    ),
                 ));
             }
             Ok(state_home)
@@ -102,23 +106,27 @@ pub fn base_directory_profile(subcommand: &str) -> Result<xdg::BaseDirectories, 
     }
 }
 
-pub fn run<'a>(config: Config, matches: &'a clap::ArgMatches) -> Result<(), CliError> {
+pub fn run<'a>(
+    config: Config,
+    command: &str,
+    matches: &'a clap::ArgMatches,
+) -> Result<(), CliError> {
     // setup logger using environment
     let env = env_logger::Env::new()
         .filter("PERMAFRUST_LOG")
         .write_style("PERMAFRUST_LOG_STYLE");
     env_logger::try_init_from_env(env)?;
 
-    // parse global arguments and create Config
+    // setup base directory
     let base_pathbuf: PathBuf = use_base_dir(&config.base)?;
-    log::trace!("Using base directory {:?}", base_pathbuf);
+    log::trace!("Using base state directory {:?}", base_pathbuf);
 
-    // perform requested subcommand
-    match matches.subcommand() {
-        ("backup", Some(m)) => backup::perform_backup(config, m)?,
-        ("freeze", Some(m)) => freeze::perform_freeze(config, m)?,
-        ("restore", Some(m)) => restore::perform_restore(config, m)?,
-        ("thaw", Some(m)) => thaw::perform_thaw(config, m)?,
+    // perform requested command
+    match command {
+        "backup" => backup::perform_backup(config, matches)?,
+        "freeze" => freeze::perform_freeze(config, matches)?,
+        "restore" => restore::perform_restore(config, matches)?,
+        "thaw" => thaw::perform_thaw(config, matches)?,
         _ => unreachable!(),
     };
     Ok(())

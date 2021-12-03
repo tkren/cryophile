@@ -29,7 +29,9 @@ pub fn perform_backup(config: Config, matches: &clap::ArgMatches) -> io::Result<
 
     let mut buffered_reader = io::BufReader::new(reader);
 
-    let vault_dir = use_or_create_dir(&config.base, matches.value_of("vault").unwrap_or(""))?;
+    let state_home = config.base.get_state_home();
+
+    let vault_dir = use_or_create_dir(&state_home, matches.value_of("vault").unwrap_or(""))?;
 
     let output_dir = use_or_create_dir(&vault_dir, matches.value_of("output").unwrap_or(""))?;
 
