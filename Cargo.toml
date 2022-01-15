@@ -2,24 +2,34 @@
 name = "permafrust"
 version = "0.1.0"
 edition = "2021"
+authors = ["Thomas Krennwallner <tk@postsubmeta.net>"]
+description = "Backup and restore tool for remote off-site backups"
+license = "MIT"
+readme = "README.md"
 repository = "https://github.com/tkren/permafrust"
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = "~2.34.0"
+chrono = "~0.4.19"
+clap = { version = "~3.1.6", features = ["cargo"] }
 crossbeam-channel = "~0.5.1"
 env_logger = "~0.9.0"
 log = "~0.4.14"
 lz4_flex = "~0.9.2"
-notify = "~5.0.0-pre.13"
-rusoto_dynamodb = "~0.47.0"
+notify = "~4.0.17"
 rusoto_glacier = "~0.47.0"
-sequoia-openpgp = "~1.6.0"
+rusoto_s3 = "~0.47.0"
+sequoia-openpgp = "~1.8.0"
 serde = "~1.0.117"
-sha2 = "~0.9.8"
+sha2 = "~0.10.2"
+uuid = "~0.8.2"
 xdg = "~2.4.0"
-zstd = "~0.9.0"
+zstd = "~0.11.0"
 
 [dev-dependencies]
-tempfile = "~3.2.0"
+tempfile = "~3.3.0"
+
+[profile.release]
+strip = "debuginfo"
