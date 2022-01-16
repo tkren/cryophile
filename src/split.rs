@@ -91,7 +91,7 @@ impl Split {
 
         log::trace!("Creating new chunk {file_path:?}");
 
-        self.file = match fs::OpenOptions::new()
+        self.file = match fs::File::options()
             .write(true)
             .create_new(true)
             .open(file_path)
