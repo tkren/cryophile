@@ -104,11 +104,7 @@ pub fn base_directory_profile(subcommand: &str) -> Result<xdg::BaseDirectories, 
     }
 }
 
-pub fn run<'a>(
-    config: Config,
-    command: &str,
-    matches: &'a clap::ArgMatches,
-) -> Result<(), CliError> {
+pub fn run(config: Config, command: &str, matches: &'_ clap::ArgMatches) -> Result<(), CliError> {
     // setup logger using environment
     let env = env_logger::Env::new()
         .filter("PERMAFRUST_LOG")
