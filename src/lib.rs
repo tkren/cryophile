@@ -98,7 +98,7 @@ fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
 }
 
 pub fn base_directory_profile(subcommand: &str) -> Result<xdg::BaseDirectories, CliError> {
-    match xdg::BaseDirectories::with_profile(env!("CARGO_PKG_NAME"), subcommand) {
+    match xdg::BaseDirectories::with_profile(clap::crate_name!(), subcommand) {
         Ok(base_dirs) => Ok(base_dirs),
         Err(err) => Err(CliError::BaseDirError(err, 1)),
     }

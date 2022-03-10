@@ -1,4 +1,4 @@
-use clap::{App, AppSettings, Arg, SubCommand};
+use clap::{Arg, Command};
 use permafrust::{
     base_directory_profile,
     constants::{DEFAULT_COMPRESSION, DEFAULT_SPOOL_PATH},
@@ -6,40 +6,38 @@ use permafrust::{
 use std::{path::PathBuf, process};
 
 fn main() {
-    let matches = App::new(env!("CARGO_PKG_NAME"))
-        .setting(AppSettings::ArgRequiredElseHelp)
-        .version(env!("CARGO_PKG_VERSION"))
-        .author("Thomas Krennwallner <tk@postsubmeta.net>")
-        .about("Glacier backup")
-        .long_about("A backup and restore tool for AWS Glacier")
+    let matches = clap::command!()
+        .subcommand_required(true)
+        .arg_required_else_help(true)
+        .long_about(clap::crate_description!())
         .subcommand(
-            SubCommand::with_name("backup")
+            Command::new("backup")
                 .about("Schedules input for backup")
                 .arg(
-                    Arg::with_name("input")
-                        .short("i")
+                    Arg::new("input")
+                        .short('i')
                         .long("input")
                         .takes_value(true)
                         .help("input file (default: stdin)"),
                 )
                 .arg(
-                    Arg::with_name("vault")
-                        .short("v")
+                    Arg::new("vault")
+                        .short('v')
                         .long("vault")
                         .takes_value(true)
                         .help("vault directory (under spool directory)"),
                 )
                 .arg(
-                    Arg::with_name("output")
-                        .short("o")
+                    Arg::new("output")
+                        .short('o')
                         .long("output")
                         .takes_value(true)
                         .required(true)
                         .help("output directory (under vault directory)"),
                 )
                 .arg(
-                    Arg::with_name("compression")
-                        .short("C")
+                    Arg::new("compression")
+                        .short('C')
                         .long("compression")
                         .takes_value(true)
                         .required(false)
@@ -48,51 +46,49 @@ fn main() {
                 ),
         )
         .subcommand(
-            SubCommand::with_name("freeze")
+            Command::new("freeze")
                 .about("Uploads backup chunks to glacier")
                 .arg(
-                    Arg::with_name("debug")
-                        .short("d")
+                    Arg::new("debug")
+                        .short('d')
                         .long("debug")
                         .help("print debug information verbosely"),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("thaw")
+            Command::new("thaw")
                 .about("Downloads backup chunks from glacier")
                 .arg(
-                    Arg::with_name("debug")
-                        .short("d")
+                    Arg::new("debug")
+                        .short('d')
                         .long("debug")
                         .help("print debug information verbosely"),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("restore")
-                .about("Restores backup chunks")
-                .arg(
-                    Arg::with_name("output")
-                        .short("o")
-                        .long("output")
-                        .takes_value(true)
-                        .help("output file (default: stdout)"),
-                ),
+            Command::new("restore").about("Restores backup chunks").arg(
+                Arg::new("output")
+                    .short('o')
+                    .long("output")
+                    .takes_value(true)
+                    .help("output file (default: stdout)"),
+            ),
         )
         .arg(
-            Arg::with_name("verbose")
-                .short("v")
+            Arg::new("verbose")
+                .short('v')
                 .long("verbose")
                 .help("Verbose mode"),
         )
         .arg(
-            Arg::with_name("quiet")
-                .short("q")
+            Arg::new("quiet")
+                .short('q')
                 .long("quiet")
                 .help("Quiet mode"),
         )
         .arg(
-            Arg::with_name("base")
-                .short("b")
+            Arg::new("base")
+                .short('b')
                 .long("base")
                 .takes_value(true)
                 .default_value(DEFAULT_SPOOL_PATH)
@@ -101,7 +97,7 @@ fn main() {
         .get_matches();
 
     let (subcommand, submatches) = match matches.subcommand() {
-        (sc, Some(m)) => (sc, m),
+        Some((sc, m)) => (sc, m),
         _ => unreachable!(),
     };
 
