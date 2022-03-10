@@ -1,6 +1,9 @@
 use clap::{App, AppSettings, Arg, SubCommand};
-use permafrust::{base_directory_profile, constants::DEFAULT_COMPRESSION};
-use std::process;
+use permafrust::{
+    base_directory_profile,
+    constants::{DEFAULT_COMPRESSION, DEFAULT_SPOOL_PATH},
+};
+use std::{path::PathBuf, process};
 
 fn main() {
     let matches = App::new(env!("CARGO_PKG_NAME"))
@@ -92,6 +95,7 @@ fn main() {
                 .short("b")
                 .long("base")
                 .takes_value(true)
+                .default_value(DEFAULT_SPOOL_PATH)
                 .help("Base directory containing all backup and restore state"),
         )
         .get_matches();
@@ -105,6 +109,7 @@ fn main() {
 
     let config = permafrust::Config {
         base: base_directories,
+        spool: PathBuf::from(matches.value_of("base").unwrap()),
         verbose: matches.is_present("verbose"),
         quiet: matches.is_present("quiet"),
     };

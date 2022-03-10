@@ -1,3 +1,5 @@
+pub static DEFAULT_SPOOL_PATH: &str = "/var/spool/permafrust";
+
 #[derive(Clone, Copy)]
 pub enum CompressionType {
     None,
