@@ -10,6 +10,6 @@ pub fn perform_restore(config: Config, matches: &clap::ArgMatches) -> io::Result
     }
 
     let output = matches.value_of("output").unwrap_or("-");
-    log::info!("The output file passed is: {}", output);
+    log::info!("The output file passed is: {output:?}");
     Ok(())
 }

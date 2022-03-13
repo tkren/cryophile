@@ -16,15 +16,18 @@ pub struct Split {
 impl Drop for Split {
     fn drop(&mut self) {
         log::trace!(
-            "Split statistics: prefix={:?} total_bytes={} chunks={} failed={}",
-            self.prefix,
-            self.tot,
-            self.val,
-            self.mark_failed
+            "Split statistics: prefix={prefix:?} total_bytes={total_bytes} chunks={chunks} failed={failed}",
+            prefix=self.prefix,
+            total_bytes=self.tot,
+            chunks=self.val,
+            failed=self.mark_failed
         );
         if let Err(err) = self.flush() {
             let path_buf = self.current_path_buf();
-            log::error!("Cannot flush {}: {}", path_buf.as_path().display(), err);
+            log::error!(
+                "Cannot flush {path}: {err}",
+                path = path_buf.as_path().display()
+            );
         }
     }
 }
@@ -57,17 +60,24 @@ impl Split {
     }
 
     fn current_path_buf(&mut self) -> PathBuf {
-        self.prefix.join(format!("chunk.{}", self.val))
+        self.prefix
+            .join(format!("chunk.{chunk_seq}", chunk_seq = self.val))
     }
 
     fn use_file_or_next(&mut self) -> io::Result<usize> {
         assert!(self.pos <= self.num, "file position exceeded max size");
 
         if self.mark_failed {
-            log::error!("Split is marked failed at {}", self.tot);
+            log::error!(
+                "Split is marked failed at {total_bytes}",
+                total_bytes = self.tot
+            );
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                format!("Split is marked failed at {}", self.tot),
+                format!(
+                    "Split is marked failed at {total_bytes}",
+                    total_bytes = self.tot
+                ),
             ));
         }
 
@@ -79,7 +89,7 @@ impl Split {
         let path_buf = self.current_path_buf();
         let file_path = path_buf.as_path();
 
-        log::trace!("Creating new chunk {:?}", file_path);
+        log::trace!("Creating new chunk {file_path:?}");
 
         self.file = match fs::OpenOptions::new()
             .write(true)
@@ -91,13 +101,13 @@ impl Split {
                 self.mark_failed = true;
 
                 log::error!(
-                    "Cannot create new file {}, marking Split failed",
-                    file_path.display()
+                    "Cannot create new file {path}, marking Split failed",
+                    path = file_path.display()
                 );
 
                 return Err(io::Error::new(
                     err.kind(),
-                    format!("Cannot create new file {}", file_path.display()),
+                    format!("Cannot create new file {path}", path = file_path.display()),
                 ));
             }
         };
@@ -115,8 +125,8 @@ impl Split {
 
         if self.mark_failed {
             log::error!(
-                "Split failed at position {}, ignoring write request",
-                self.tot
+                "Split failed at position {total_bytes}, ignoring write request",
+                total_bytes = self.tot
             );
             return Ok(0);
         }
@@ -142,7 +152,10 @@ impl io::Write for Split {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.mark_failed {
-            log::error!("Ignoring error at position {}", self.tot);
+            log::error!(
+                "Ignoring error at position {total_bytes}",
+                total_bytes = self.tot
+            );
             return Ok(0);
         }
 

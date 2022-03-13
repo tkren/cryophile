@@ -45,9 +45,9 @@ impl From<log::SetLoggerError> for CliError {
 impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CliError::BaseDirError(error, code) => write!(f, "{} ({})", error, code),
-            CliError::EnvError(error, code) => write!(f, "{} ({})", error, code),
-            CliError::IoError(error, code) => write!(f, "{} ({})", error, code),
+            CliError::BaseDirError(error, code) => write!(f, "{error} ({code})"),
+            CliError::EnvError(error, code) => write!(f, "{error} ({code})"),
+            CliError::IoError(error, code) => write!(f, "{error} ({code})"),
             CliError::LogError(_error, _code) => write!(f, "Cannot call set_logger more than once"),
         }
     }
@@ -78,7 +78,7 @@ fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
     let state_home = base.get_state_home();
     match fs::metadata(&state_home) {
         Err(_err) => {
-            log::info!("Creating state directory {:?}", state_home);
+            log::info!("Creating state directory {state_home:?}");
             match base.create_state_directory("") {
                 Ok(state_path) => Ok(state_path),
                 Err(err) => Err(err),
@@ -88,10 +88,7 @@ fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
             if !metadata.is_dir() {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    format!(
-                        "Base state home {:?} is not an existing directory",
-                        state_home
-                    ),
+                    format!("Base state home {state_home:?} is not an existing directory"),
                 ));
             }
             Ok(state_home)
@@ -119,7 +116,7 @@ pub fn run<'a>(
 
     // setup base directory
     let base_pathbuf: PathBuf = use_base_dir(&config.base)?;
-    log::trace!("Using base state directory {:?}", base_pathbuf);
+    log::trace!("Using base state directory {base_pathbuf:?}");
 
     // perform requested command
     match command {

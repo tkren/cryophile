@@ -22,7 +22,7 @@ pub fn perform_backup(config: Config, matches: &clap::ArgMatches) -> io::Result<
             Box::new(io::stdin())
         }
         _ => {
-            log::info!("Opening `{}' ...", input);
+            log::info!("Opening {input:?} ...");
             Box::new(fs::File::open(input)?)
         }
     };
@@ -71,7 +71,7 @@ fn use_or_create_dir(base: &Path, dir: &str) -> io::Result<PathBuf> {
     if components.len() != 1 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("Invalid path {} given", dir),
+            format!("Invalid path {dir:?} given"),
         ));
     }
 
@@ -80,22 +80,22 @@ fn use_or_create_dir(base: &Path, dir: &str) -> io::Result<PathBuf> {
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Invalid path {} given", dir),
+                format!("Invalid path {dir:?} given"),
             ));
         }
     };
 
     if let Err(err) = fs::read_dir(&base_dir_path) {
         if err.kind() == io::ErrorKind::NotFound {
-            log::info!("Creating directory {:?}", base_dir_path);
+            log::info!("Creating directory {base_dir_path:?}");
             fs::create_dir(&base_dir_path)?;
         } else {
             // PermissionDenied or NotADirectory
-            log::error!("Cannot use path {:?}", base_dir_path);
+            log::error!("Cannot use path {base_dir_path:?}");
             return Err(err);
         }
     } else {
-        log::trace!("Using directory {:?}", base_dir_path);
+        log::trace!("Using directory {base_dir_path:?}");
     }
 
     Ok(base_dir_path)

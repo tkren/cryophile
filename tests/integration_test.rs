@@ -11,7 +11,7 @@ use tempfile;
 fn test_split_write() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
-    println!("tmpdir {:?}", tmp_path);
+    println!("tmpdir {tmp_path:?}");
     let mut splitter = permafrust::Split::new(tmp_path, 3);
 
     let mut s = String::from("0123456789abcdef");
@@ -21,12 +21,12 @@ fn test_split_write() {
             assert_eq!(n, s.len());
         }
         Err(err) => {
-            assert!(0 == 1, "Split::write: {}", err);
+            assert!(0 == 1, "Split::write: {err}");
         }
     }
 
     for i in 1..6 {
-        let chunk = format!("chunk.{}", i);
+        let chunk = format!("chunk.{i}");
         let path = tmp_dir.path().join(chunk);
         let mut chunk_file = File::open(path.clone()).expect("failed to open chunk file");
         let mut buf = String::new();
@@ -53,7 +53,7 @@ fn test_split_write() {
             assert_eq!(n, 0);
         }
         Err(err) => {
-            assert!(0 == 1, "Split::write: {}", err);
+            assert!(0 == 1, "Split::write: {err}");
         }
     }
 
@@ -64,7 +64,7 @@ fn test_split_write() {
 fn test_split_write_vectored() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
-    println!("tmpdir {:?}", tmp_path);
+    println!("tmpdir {tmp_path:?}");
     let mut splitter = permafrust::Split::new(tmp_path, 3);
 
     let s = String::from("0123456789abcdef");
@@ -76,7 +76,7 @@ fn test_split_write_vectored() {
             assert_eq!(n, 2 * s.len());
         }
         Err(err) => {
-            assert!(0 == 1, "Split::write_vectored: {}", err);
+            assert!(0 == 1, "Split::write_vectored: {err}");
         }
     }
 }
@@ -85,7 +85,7 @@ fn test_split_write_vectored() {
 fn test_copy_to_split() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
-    println!("tmpdir {:?}", tmp_path);
+    println!("tmpdir {tmp_path:?}");
 
     let mut splitter = permafrust::Split::new(tmp_path, 512);
 

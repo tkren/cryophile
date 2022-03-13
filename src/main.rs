@@ -112,19 +112,19 @@ fn main() {
     if let Err(err) = permafrust::run(config, subcommand, submatches) {
         let code = match err {
             permafrust::CliError::BaseDirError(ref e, code) => {
-                log::error!("BaseDirectory Error: {}", e);
+                log::error!("BaseDirectory Error: {e}");
                 code
             }
             permafrust::CliError::EnvError(ref e, code) => {
-                log::error!("Environment Error: {}", e);
+                log::error!("Environment Error: {e}");
                 code
             }
             permafrust::CliError::IoError(ref e, code) => {
-                log::error!("I/O Error: {}", e);
+                log::error!("I/O Error: {e}");
                 code
             }
             permafrust::CliError::LogError(ref e, code) => {
-                log::error!("Log Error: {}", e);
+                log::error!("Log Error: {e}");
                 code
             }
         };
