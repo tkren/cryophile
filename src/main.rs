@@ -1,9 +1,31 @@
-use clap::{Arg, Command};
+use clap::{Arg, ArgMatches, Command};
 use permafrust::{
     base_directory_profile,
     constants::{DEFAULT_COMPRESSION, DEFAULT_SPOOL_PATH},
 };
 use std::{path::PathBuf, process};
+
+fn on_clap_error(err: clap::error::Error) -> ArgMatches {
+    err.print().expect("Error writing error");
+
+    let code = match err.use_stderr() {
+        true => exitcode::USAGE,
+        false => match err.kind() {
+            clap::ErrorKind::DisplayHelp => exitcode::OK,
+            clap::ErrorKind::DisplayVersion => exitcode::OK,
+            clap::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => exitcode::USAGE,
+            _ => exitcode::USAGE,
+        },
+    };
+
+    // perform clap::util::safe_exit(code)
+    use std::io::Write;
+
+    let _ = std::io::stdout().lock().flush();
+    let _ = std::io::stderr().lock().flush();
+
+    std::process::exit(code);
+}
 
 fn main() {
     let matches = clap::command!()
@@ -94,7 +116,8 @@ fn main() {
                 .default_value(DEFAULT_SPOOL_PATH)
                 .help("Base directory containing all backup and restore state"),
         )
-        .get_matches();
+        .try_get_matches()
+        .unwrap_or_else(on_clap_error);
 
     let (subcommand, submatches) = match matches.subcommand() {
         Some((sc, m)) => (sc, m),
