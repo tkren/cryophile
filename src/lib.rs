@@ -21,11 +21,16 @@ pub struct Config {
     pub quiet: bool,
 }
 
+#[derive(thiserror::Error, fmt::Debug)]
 pub enum CliError {
-    BaseDirError(xdg::BaseDirectoriesError, i32),
-    EnvError(env::VarError, i32),
-    IoError(io::Error, i32),
-    LogError(log::SetLoggerError, i32),
+    #[error("BaseDirError: {0} (exit {1})")]
+    BaseDirError(xdg::BaseDirectoriesError, exitcode::ExitCode),
+    #[error("EnvError: {0} (exit {1})")]
+    EnvError(env::VarError, exitcode::ExitCode),
+    #[error("IoError: {0} (exit {1})")]
+    IoError(io::Error, exitcode::ExitCode),
+    #[error("LogError: Cannot call set_logger more than once (exit {1})")]
+    LogError(log::SetLoggerError, exitcode::ExitCode),
 }
 
 impl From<io::Error> for CliError {
@@ -33,45 +38,13 @@ impl From<io::Error> for CliError {
         if let Some(raw_os_error) = error.raw_os_error() {
             return CliError::IoError(error, raw_os_error);
         }
-        CliError::IoError(error, 1)
+        CliError::IoError(error, exitcode::IOERR)
     }
 }
 
 impl From<log::SetLoggerError> for CliError {
     fn from(error: log::SetLoggerError) -> Self {
         CliError::LogError(error, 1)
-    }
-}
-
-impl fmt::Display for CliError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CliError::BaseDirError(error, code) => write!(f, "{error} ({code})"),
-            CliError::EnvError(error, code) => write!(f, "{error} ({code})"),
-            CliError::IoError(error, code) => write!(f, "{error} ({code})"),
-            CliError::LogError(_error, _code) => write!(f, "Cannot call set_logger more than once"),
-        }
-    }
-}
-
-impl fmt::Debug for CliError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::BaseDirError(error, code) => f
-                .debug_tuple("BaseDirError")
-                .field(error)
-                .field(code)
-                .finish(),
-            Self::EnvError(error, code) => {
-                f.debug_tuple("EnvError").field(error).field(code).finish()
-            }
-            Self::IoError(error, code) => {
-                f.debug_tuple("IoError").field(error).field(code).finish()
-            }
-            Self::LogError(error, code) => {
-                f.debug_tuple("LogError").field(error).field(code).finish()
-            }
-        }
     }
 }
 
@@ -100,7 +73,7 @@ fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
 pub fn base_directory_profile(subcommand: &str) -> Result<xdg::BaseDirectories, CliError> {
     match xdg::BaseDirectories::with_profile(clap::crate_name!(), subcommand) {
         Ok(base_dirs) => Ok(base_dirs),
-        Err(err) => Err(CliError::BaseDirError(err, 1)),
+        Err(err) => Err(CliError::BaseDirError(err, exitcode::CONFIG)),
     }
 }
 

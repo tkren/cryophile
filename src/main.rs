@@ -111,25 +111,15 @@ fn main() {
     };
 
     if let Err(err) = permafrust::run(config, subcommand, submatches) {
+        log::error!("{err}");
         let code = match err {
-            permafrust::CliError::BaseDirError(ref e, code) => {
-                log::error!("BaseDirectory Error: {e}");
-                code
-            }
-            permafrust::CliError::EnvError(ref e, code) => {
-                log::error!("Environment Error: {e}");
-                code
-            }
-            permafrust::CliError::IoError(ref e, code) => {
-                log::error!("I/O Error: {e}");
-                code
-            }
-            permafrust::CliError::LogError(ref e, code) => {
-                log::error!("Log Error: {e}");
-                code
-            }
+            permafrust::CliError::BaseDirError(_e, _code) => exitcode::CONFIG,
+            permafrust::CliError::EnvError(_e, _code) => exitcode::CONFIG,
+            permafrust::CliError::IoError(_e, _code) => exitcode::IOERR,
+            permafrust::CliError::LogError(_e, _code) => exitcode::SOFTWARE,
         };
-
         process::exit(code);
     }
+
+    process::exit(exitcode::OK);
 }
