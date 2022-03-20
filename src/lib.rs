@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 
 pub struct Config {
     pub base: xdg::BaseDirectories,
+    pub chunk_size: usize,
     pub spool: PathBuf,
     pub verbose: bool,
     pub quiet: bool,

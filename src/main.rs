@@ -1,7 +1,7 @@
 use clap::{Arg, ArgMatches, Command};
 use permafrust::{
     base_directory_profile,
-    constants::{DEFAULT_COMPRESSION, DEFAULT_SPOOL_PATH},
+    constants::{DEFAULT_CHUNK_SIZE, DEFAULT_COMPRESSION, DEFAULT_SPOOL_PATH},
 };
 use std::{path::PathBuf, process};
 
@@ -56,6 +56,15 @@ fn main() {
                         .takes_value(true)
                         .required(true)
                         .help("output directory (under vault directory)"),
+                )
+                .arg(
+                    Arg::new("size")
+                        .short('s')
+                        .long("size")
+                        .takes_value(true)
+                        .required(false)
+                        .default_value(DEFAULT_CHUNK_SIZE)
+                        .help("default chunk size"),
                 )
                 .arg(
                     Arg::new("compression")
@@ -126,8 +135,33 @@ fn main() {
 
     let base_directories = base_directory_profile(subcommand).unwrap();
 
+    let parse_config = parse_size::Config::new()
+        .with_binary()
+        .with_byte_suffix(parse_size::ByteSuffix::Deny);
+
+    let chunk_size: &str = if subcommand == "backup" {
+        submatches.value_of("size").unwrap()
+    } else {
+        DEFAULT_CHUNK_SIZE
+    };
+
+    let parse_size_result = parse_config.parse_size(chunk_size);
+
+    let chunk_size = match parse_size_result {
+        Ok(n) => usize::try_from(n).expect("size exceeds usize"),
+        Err(err) => {
+            log::error!("Cannot parse chunk size option: {err}");
+            use std::io::Write;
+            let _ = std::io::stderr().lock().flush();
+            process::exit(exitcode::CONFIG);
+        }
+    };
+
+    log::trace!("Setting backup chunk size to {chunk_size}");
+
     let config = permafrust::Config {
         base: base_directories,
+        chunk_size,
         spool: PathBuf::from(matches.value_of("base").unwrap()),
         verbose: matches.is_present("verbose"),
         quiet: matches.is_present("quiet"),

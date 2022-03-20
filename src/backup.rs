@@ -60,7 +60,7 @@ pub fn perform_backup(config: Config, matches: &clap::ArgMatches) -> io::Result<
     crate::use_dir_atomic_create_maybe(&backup_dir, Some(true), Some(true))?;
 
     // TODO signal handling, Ctrl+C does not finish stream https://rust-cli.github.io/book/in-depth/signals.html
-    let splitter = Split::new(backup_dir, 512);
+    let splitter = Split::new(backup_dir, config.chunk_size);
 
     let mut writer = match matches
         .value_of("compression")
