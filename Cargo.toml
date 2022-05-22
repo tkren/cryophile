@@ -13,7 +13,7 @@ publish = false
 
 [dependencies]
 chrono = "~0.4.19"
-clap = { version = "~3.1.6", features = ["cargo"] }
+clap = { version = "~3.1.18", features = ["cargo", "derive"] }
 crossbeam-channel = "~0.5.1"
 env_logger = "~0.9.0"
 exitcode = "~1.1.2"
