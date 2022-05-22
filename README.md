@@ -9,6 +9,11 @@ This is the Permafrust backup daemon.
 dd if=/dev/random count=4096 | PARMAFRUST_LOG_STYLE= PERMAFRUST_LOG=trace cargo run --  -b /tmp backup -v UUID -o DATE
 ```
 
+If notify fails, we need to bump max_user_instances, see https://stackoverflow.com/a/71082431/2982090
+```
+sudo sysctl fs.inotify.max_user_instances=512
+```
+
 ## Update dependencies
 
 ```shell
