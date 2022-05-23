@@ -129,6 +129,11 @@ fn main() -> CliResult {
         .try_get_matches()
         .unwrap_or_else(on_clap_error);
 
+    if let Err(err) = permafrust::setup() {
+        eprintln!("Cannot initialize permafrust: {err}");
+        return CliResult::Abort;
+    };
+
     let (subcommand, submatches) = match matches.subcommand() {
         Some((sc, m)) => (sc, m),
         _ => unreachable!(),

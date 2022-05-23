@@ -144,13 +144,16 @@ pub fn base_directory_profile(subcommand: &str) -> Result<xdg::BaseDirectories, 
     }
 }
 
-pub fn run(config: Config, command: &str, matches: &'_ clap::ArgMatches) -> Result<(), CliError> {
+pub fn setup() -> Result<(), CliError> {
     // setup logger using environment
     let env = env_logger::Env::new()
         .filter("PERMAFRUST_LOG")
         .write_style("PERMAFRUST_LOG_STYLE");
     env_logger::try_init_from_env(env)?;
+    Ok(())
+}
 
+pub fn run(config: Config, command: &str, matches: &'_ clap::ArgMatches) -> Result<(), CliError> {
     // setup base directory
     let base_pathbuf: PathBuf = use_base_dir(&config.base)?;
     log::trace!("Using base state directory {base_pathbuf:?}");
