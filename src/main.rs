@@ -2,19 +2,20 @@ use clap::{Arg, ArgMatches, Command};
 use permafrust::{
     base_directory_profile,
     constants::{DEFAULT_CHUNK_SIZE, DEFAULT_COMPRESSION, DEFAULT_SPOOL_PATH},
+    CliError, CliResult,
 };
-use std::{path::PathBuf, process};
+use std::path::PathBuf;
 
 fn on_clap_error(err: clap::error::Error) -> ArgMatches {
     err.print().expect("Error writing error");
 
-    let code = match err.use_stderr() {
-        true => exitcode::USAGE,
+    let code: CliResult = match err.use_stderr() {
+        true => CliResult::Usage,
         false => match err.kind() {
-            clap::ErrorKind::DisplayHelp => exitcode::OK,
-            clap::ErrorKind::DisplayVersion => exitcode::OK,
-            clap::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => exitcode::USAGE,
-            _ => exitcode::USAGE,
+            clap::ErrorKind::DisplayHelp => CliResult::Ok,
+            clap::ErrorKind::DisplayVersion => CliResult::Ok,
+            clap::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => CliResult::Usage,
+            _ => CliResult::Usage,
         },
     };
 
@@ -24,10 +25,10 @@ fn on_clap_error(err: clap::error::Error) -> ArgMatches {
     let _ = std::io::stdout().lock().flush();
     let _ = std::io::stderr().lock().flush();
 
-    std::process::exit(code);
+    std::process::exit(code as i32);
 }
 
-fn main() {
+fn main() -> CliResult {
     let matches = clap::command!()
         .subcommand_required(true)
         .arg_required_else_help(true)
@@ -153,7 +154,7 @@ fn main() {
             log::error!("Cannot parse chunk size option: {err}");
             use std::io::Write;
             let _ = std::io::stderr().lock().flush();
-            process::exit(exitcode::CONFIG);
+            return CliResult::ConfigError;
         }
     };
 
@@ -170,13 +171,13 @@ fn main() {
     if let Err(err) = permafrust::run(config, subcommand, submatches) {
         log::error!("{err}");
         let code = match err {
-            permafrust::CliError::BaseDirError(_e, _code) => exitcode::CONFIG,
-            permafrust::CliError::EnvError(_e, _code) => exitcode::CONFIG,
-            permafrust::CliError::IoError(_e, _code) => exitcode::IOERR,
-            permafrust::CliError::LogError(_e, _code) => exitcode::SOFTWARE,
+            CliError::BaseDirError(_e, code) => code,
+            CliError::EnvError(_e, code) => code,
+            CliError::IoError(_e, code) => code,
+            CliError::LogError(_e, code) => code,
         };
-        process::exit(code);
+        return code;
     }
 
-    process::exit(exitcode::OK);
+    CliResult::Ok
 }

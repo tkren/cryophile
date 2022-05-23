@@ -14,6 +14,7 @@ use std::fs;
 use std::io;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
+use std::process::{ExitCode, Termination};
 
 pub struct Config {
     pub base: xdg::BaseDirectories,
@@ -23,30 +24,54 @@ pub struct Config {
     pub quiet: bool,
 }
 
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+pub enum CliResult {
+    Ok = 0,
+    IoError = 42,
+    Usage = 64,
+    LogError = 65,
+    ConfigError = 78,
+    Abort = 255,
+}
+
+impl fmt::Display for CliResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "(exit code {})", *self as u8)
+    }
+}
+
+impl Termination for CliResult {
+    fn report(self) -> ExitCode {
+        match self {
+            CliResult::Ok => log::debug!("Terminating without error"),
+            _ => log::error!("Terminating with error(s) {self}"),
+        };
+        ExitCode::from(self as u8)
+    }
+}
+
 #[derive(thiserror::Error, fmt::Debug)]
 pub enum CliError {
-    #[error("BaseDirError: {0} (exit {1})")]
-    BaseDirError(xdg::BaseDirectoriesError, exitcode::ExitCode),
-    #[error("EnvError: {0} (exit {1})")]
-    EnvError(env::VarError, exitcode::ExitCode),
-    #[error("IoError: {0} (exit {1})")]
-    IoError(io::Error, exitcode::ExitCode),
-    #[error("LogError: Cannot call set_logger more than once (exit {1})")]
-    LogError(log::SetLoggerError, exitcode::ExitCode),
+    #[error("BaseDirError: {0} {1}")]
+    BaseDirError(xdg::BaseDirectoriesError, CliResult),
+    #[error("EnvError: {0} {1}")]
+    EnvError(env::VarError, CliResult),
+    #[error("IoError: {0} {1}")]
+    IoError(io::Error, CliResult),
+    #[error("LogError: Cannot call set_logger more than once {1}")]
+    LogError(log::SetLoggerError, CliResult),
 }
 
 impl From<io::Error> for CliError {
     fn from(error: io::Error) -> Self {
-        if let Some(raw_os_error) = error.raw_os_error() {
-            return CliError::IoError(error, raw_os_error);
-        }
-        CliError::IoError(error, exitcode::IOERR)
+        CliError::IoError(error, CliResult::IoError)
     }
 }
 
 impl From<log::SetLoggerError> for CliError {
     fn from(error: log::SetLoggerError) -> Self {
-        CliError::LogError(error, 1)
+        CliError::LogError(error, CliResult::LogError)
     }
 }
 
@@ -115,7 +140,7 @@ fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
 pub fn base_directory_profile(subcommand: &str) -> Result<xdg::BaseDirectories, CliError> {
     match xdg::BaseDirectories::with_profile(clap::crate_name!(), subcommand) {
         Ok(base_dirs) => Ok(base_dirs),
-        Err(err) => Err(CliError::BaseDirError(err, exitcode::CONFIG)),
+        Err(err) => Err(CliError::BaseDirError(err, CliResult::ConfigError)),
     }
 }
 
