@@ -1,4 +1,5 @@
 mod backup;
+pub mod cli;
 pub mod constants;
 pub mod encoder;
 mod freeze;
@@ -6,6 +7,8 @@ mod restore;
 mod split;
 mod thaw;
 
+use cli::Cli;
+use cli::Command;
 pub use encoder::FinalEncoder;
 pub use split::Split;
 use std::env;
@@ -18,10 +21,7 @@ use std::process::{ExitCode, Termination};
 
 pub struct Config {
     pub base: xdg::BaseDirectories,
-    pub chunk_size: usize,
-    pub spool: PathBuf,
-    pub verbose: bool,
-    pub quiet: bool,
+    pub cli: Cli,
 }
 
 #[repr(u8)]
@@ -153,22 +153,21 @@ pub fn setup() -> Result<(), CliError> {
     Ok(())
 }
 
-pub fn run(config: Config, command: &str, matches: &'_ clap::ArgMatches) -> Result<(), CliError> {
+pub fn run(config: &Config) -> Result<(), CliError> {
     // setup base directory
     let base_pathbuf: PathBuf = use_base_dir(&config.base)?;
     log::trace!("Using base state directory {base_pathbuf:?}");
 
-    let spool = &config.spool;
+    let spool = &config.cli.base;
     use_dir_atomic_create_maybe(spool, None, None)?;
     log::trace!("Using spool directory {spool:?}");
 
     // perform requested command
-    match command {
-        "backup" => backup::perform_backup(config, matches)?,
-        "freeze" => freeze::perform_freeze(config, matches)?,
-        "restore" => restore::perform_restore(config, matches)?,
-        "thaw" => thaw::perform_thaw(config, matches)?,
-        _ => unreachable!(),
+    match &config.cli.command {
+        Command::Backup(backup) => backup::perform_backup(&config.cli, backup)?,
+        Command::Freeze(freeze) => freeze::perform_freeze(&config.cli, freeze, &config.base)?,
+        Command::Restore(restore) => restore::perform_restore(&config.cli, restore)?,
+        Command::Thaw(thaw) => thaw::perform_thaw(&config.cli, thaw)?,
     };
     Ok(())
 }

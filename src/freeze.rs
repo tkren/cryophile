@@ -1,22 +1,27 @@
-use crate::Config;
+use crate::cli::{Cli, Freeze};
 use notify::{RecursiveMode, Watcher};
 use std::io;
 use std::sync::mpsc;
+use xdg::BaseDirectories;
 
-pub fn perform_freeze(config: Config, matches: &clap::ArgMatches) -> io::Result<()> {
+pub fn perform_freeze(
+    cli: &Cli,
+    _freeze: &Freeze,
+    base_directories: &BaseDirectories,
+) -> io::Result<()> {
     log::info!("FREEZE...");
-    if config.verbose {
+    if cli.debug > 0 {
         log::debug!("Printing verbose info...");
-    } else if !config.quiet {
+    } else if !cli.quiet {
         log::debug!("Printing normally...");
     }
 
-    let debug = matches.is_present("debug");
+    let debug = cli.debug > 0;
     if debug {
         log::debug!("We debug");
     }
 
-    let state_home = config.base.get_state_home();
+    let state_home = base_directories.get_state_home();
 
     let (tx, rx) = mpsc::channel();
 

@@ -1,15 +1,15 @@
-use crate::Config;
+use crate::cli::{Cli, Thaw};
 use std::io;
 
-pub fn perform_thaw(config: Config, matches: &clap::ArgMatches) -> io::Result<()> {
+pub fn perform_thaw(cli: &Cli, _thaw: &Thaw) -> io::Result<()> {
     log::info!("THAW...");
-    if config.verbose {
+    if cli.debug > 0 {
         log::debug!("Printing verbose info...");
-    } else if !config.quiet {
+    } else if !cli.quiet {
         log::debug!("Printing normally...");
     }
 
-    let debug = matches.is_present("debug");
+    let debug = cli.debug > 0;
     if debug {
         log::debug!("We debug");
     }

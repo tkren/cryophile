@@ -1,46 +1,40 @@
 use chrono::{DateTime, Utc};
 
-use crate::constants::DEFAULT_COMPRESSION;
-use crate::Config;
+use crate::cli::Backup;
+use crate::cli::Cli;
+use crate::constants::CompressionType;
 use crate::FinalEncoder;
 use crate::Split;
 use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
-pub fn perform_backup(config: Config, matches: &clap::ArgMatches) -> io::Result<()> {
+pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     log::info!("BACKUP...");
-    if config.verbose {
+    if cli.debug > 0 {
         log::debug!("Printing verbose info...");
-    } else if !config.quiet {
+    } else if !cli.quiet {
         log::debug!("Printing normally...");
     }
 
     let mut backup_dir = PathBuf::new();
 
     // backup_dir starts with the spool directory
-    let spool = &config.spool;
+    let spool = &cli.base;
     backup_dir.push(spool);
 
-    // next we add a vault
-    let vault_arg = matches.value_of("vault").unwrap_or("");
-    let vault_uuid = match uuid::Uuid::parse_str(vault_arg) {
-        Ok(uuid) => uuid.to_string(), // lower-case hyphenated UUID
-
-        Err(err) => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Invalid vault {vault_arg} given: {err}"),
-            ));
-        }
-    };
-
-    let vault_dir = build_canonical_path(&vault_uuid)?;
+    // next we add a vault as lower-case hyphenated UUID
+    let backup_vault_string = backup.vault.to_string();
+    let backup_vault_path = Path::new(&backup_vault_string);
+    let vault_dir = build_canonical_path(backup_vault_path)?;
     log::trace!("Using vault directory {vault_dir:?}");
     backup_dir.push(vault_dir);
 
     // then the output key, potentially containing a path of length >= 1
-    let output = matches.value_of("output").unwrap_or("");
+    let output: &Path = match &backup.output {
+        None => Path::new(""),
+        Some(output) => output.as_path().as_ref(),
+    };
 
     let output_dir = build_canonical_path(output)?;
     log::trace!("Using output directory {output_dir:?}");
@@ -48,9 +42,10 @@ pub fn perform_backup(config: Config, matches: &clap::ArgMatches) -> io::Result<
 
     // finally, the current UTC timestamp
     let utc_now: DateTime<Utc> = Utc::now();
-    let utc_timestamp = utc_now.timestamp().to_string();
+    let utc_string = utc_now.timestamp().to_string();
+    let utc_timestamp = Path::new(&utc_string);
 
-    let timestamp_dir = build_canonical_path(&utc_timestamp)?;
+    let timestamp_dir = build_canonical_path(utc_timestamp)?;
     log::trace!("Using timestamp directory {timestamp_dir:?}");
     backup_dir.push(timestamp_dir);
 
@@ -60,33 +55,32 @@ pub fn perform_backup(config: Config, matches: &clap::ArgMatches) -> io::Result<
     crate::use_dir_atomic_create_maybe(&backup_dir, Some(true), Some(true))?;
 
     // TODO signal handling, Ctrl+C does not finish stream https://rust-cli.github.io/book/in-depth/signals.html
-    let splitter = Split::new(backup_dir, config.chunk_size);
+    let splitter = Split::new(backup_dir, backup.size);
 
-    let mut writer = match matches
-        .value_of("compression")
-        .unwrap_or_else(|| DEFAULT_COMPRESSION.into())
-    {
-        "zstd" => {
+    let mut writer = match backup.compression {
+        CompressionType::Zstd => {
             let zstd_encoder = zstd::stream::Encoder::new(splitter, 0)?;
             FinalEncoder::new(Box::new(zstd_encoder))
         }
-        "lz4" => {
+        CompressionType::Lz4 => {
             let lz4_encoder = lz4_flex::frame::FrameEncoder::new(splitter);
             FinalEncoder::new(Box::new(lz4_encoder))
         }
-        _ => FinalEncoder::new(Box::new(splitter)),
+        CompressionType::None => FinalEncoder::new(Box::new(splitter)),
     };
 
     // setup input after we created the backup directory to prevent
     // reading streams (or fifo files) that cannot be written later
-    let input = matches.value_of("input").unwrap_or("-");
-
-    let reader: Box<dyn io::Read> = match input {
-        "-" => {
+    let reader: Box<dyn io::Read> = match &backup.input {
+        Some(p) if p.as_path() == Path::new("-") => {
             log::info!("Reading from stdin ...");
             Box::new(io::stdin())
         }
-        _ => {
+        None => {
+            log::info!("Reading from stdin ...");
+            Box::new(io::stdin())
+        }
+        Some(input) => {
             log::info!("Opening {input:?} ...");
             Box::new(fs::File::open(input)?)
         }
@@ -99,19 +93,18 @@ pub fn perform_backup(config: Config, matches: &clap::ArgMatches) -> io::Result<
     Ok(())
 }
 
-fn build_canonical_path(dir: &str) -> io::Result<PathBuf> {
-    if dir.is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Empty path given",
-        ));
-    }
+fn build_canonical_path(dir: &Path) -> io::Result<PathBuf> {
+    //if dir.is_empty() {
+    //    return Err(io::Error::new(
+    //        io::ErrorKind::InvalidInput,
+    //        "Empty path given",
+    //    ));
+    // }
 
-    let dir_path = Path::new(dir);
     let mut canonical_dir_path = PathBuf::new();
 
     // create canonical representation
-    for component in dir_path.components() {
+    for component in dir.components() {
         match component {
             Component::Normal(subpath) => {
                 canonical_dir_path.push(subpath);
