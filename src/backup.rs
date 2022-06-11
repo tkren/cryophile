@@ -15,7 +15,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     let mut backup_dir = PathBuf::new();
 
     // backup_dir starts with the spool directory
-    let spool = &cli.base;
+    let spool = &cli.spool;
     backup_dir.push(spool);
 
     // next we add a vault as lower-case hyphenated UUID

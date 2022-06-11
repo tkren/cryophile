@@ -176,7 +176,7 @@ pub fn run(config: &Config) -> Result<(), CliError> {
     let base_pathbuf: PathBuf = use_base_dir(&config.base)?;
     log::trace!("Using base state directory {base_pathbuf:?}");
 
-    let spool = &config.cli.base;
+    let spool = &config.cli.spool;
     use_dir_atomic_create_maybe(spool, None, None)?;
     log::trace!("Using spool directory {spool:?}");
 

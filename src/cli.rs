@@ -13,42 +13,42 @@ pub struct Cli {
     #[clap(subcommand)]
     pub command: Command,
 
-    /// Turn debugging information on
+    /// Spool directory containing all backup and restore state
     #[clap(
         short, long, parse(from_os_str),
         default_value_os_t = PathBuf::from(DEFAULT_SPOOL_PATH),
         value_name = "FILE",
-        help = "Base directory containing all backup and restore state",
+        help = "Spool directory containing all backup and restore state",
     )]
-    pub base: PathBuf,
+    pub spool: PathBuf,
 
-    /// Turn debugging information on
+    /// Print debug information verbosely
     #[clap(
         short,
         long,
         parse(from_occurrences),
-        help = "print debug information verbosely"
+        help = "Print debug information verbosely"
     )]
     pub debug: usize,
 
-    /// Turn debugging information on
+    /// Quiet mode
     #[clap(short, long, help = "Quiet mode")]
     pub quiet: bool,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Backup
-    #[clap(arg_required_else_help = true)]
+    /// Queue input for upload
+    #[clap(arg_required_else_help = false)]
     Backup(Backup),
-    /// Freeze: upload backup
-    #[clap(arg_required_else_help = true)]
+    /// Upload backup
+    #[clap(arg_required_else_help = false)]
     Freeze(Freeze),
-    /// Thaw: download backup
-    #[clap(arg_required_else_help = true)]
+    /// Download backup
+    #[clap(arg_required_else_help = false)]
     Thaw(Thaw),
-    /// Restore
-    #[clap(arg_required_else_help = true)]
+    /// Uncompress and decrypt downloaded backup files
+    #[clap(arg_required_else_help = false)]
     Restore(Restore),
 }
 

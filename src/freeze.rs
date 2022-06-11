@@ -25,31 +25,31 @@ pub fn perform_freeze(
     };
 
     let config = if let Some(config) = &freeze.config {
-        if config.exists() {
-            if let Err(err) = watcher.watch(config, RecursiveMode::NonRecursive) {
-                log::error!("Cannot setup config watcher {config:?} failed: {err:?}");
-                return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
-            }
-        }
         config.to_path_buf()
     } else {
-        let default_config = base_directories.get_config_file("permafrust");
-        if let Err(err) = watcher.watch(&default_config, RecursiveMode::NonRecursive) {
-            log::error!("Cannot setup config watcher {default_config:?} failed: {err:?}");
-            return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
-        }
+        let default_config = base_directories.get_config_file("permafrust.toml");
         default_config
     };
 
-    log::trace!("Watching config {path}", path = config.display());
-
-    let spool_dir = cli.base.as_ref();
-    if let Err(err) = watcher.watch(spool_dir, RecursiveMode::Recursive) {
-        log::error!("notify watcher {spool_dir:?} failed: {err:?}");
-        return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
+    if config.exists() {
+        if let Err(err) = watcher.watch(&config, RecursiveMode::NonRecursive) {
+            log::error!("Cannot setup config watcher {config:?} failed: {err:?}");
+            return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
+        }
+        log::trace!("Watching config {path}", path = config.display());
+    } else {
+        log::warn!(
+            "Configuration {path} does not exist, ignoring configuration updates",
+            path = config.display()
+        );
     }
 
-    log::trace!("Watching spool {path}", path = cli.base.display());
+    let spool = cli.spool.as_ref();
+    if let Err(err) = watcher.watch(spool, RecursiveMode::Recursive) {
+        log::error!("notify watcher {spool:?} failed: {err:?}");
+        return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
+    }
+    log::trace!("Watching spool {path}", path = spool.display());
 
     for res in rx {
         if let Err(err) = event_handler(res) {
