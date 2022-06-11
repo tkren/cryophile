@@ -36,7 +36,7 @@ fn main() -> CliResult {
 
     let config = Config {
         base: base_directories,
-        cli: cli,
+        cli,
     };
 
     if let Err(err) = permafrust::run(&config) {

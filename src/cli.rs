@@ -102,8 +102,8 @@ pub struct Restore {
 }
 
 fn parse_compression(s: &str) -> Result<CompressionType, String> {
-    let compression = CompressionType::from_str(s)
-        .map_err(|e| format!("Cannot parse compression type: {msg}", msg = e.to_string()))?;
+    let compression =
+        CompressionType::from_str(s).map_err(|e| format!("Cannot parse compression type: {e}"))?;
     Ok(compression)
 }
 
@@ -113,18 +113,13 @@ fn parse_chunk_size(s: &str) -> Result<usize, String> {
         .with_byte_suffix(parse_size::ByteSuffix::Deny);
     let parse_size_result = parse_config
         .parse_size(s)
-        .map_err(|e| format!("Cannot parse chunk size: {msg}", msg = e.to_string()))?;
-    let chunk_size = usize::try_from(parse_size_result).map_err(|e| {
-        format!(
-            "Cannot parse chunk size (size exceeds usize): {msg}",
-            msg = e.to_string()
-        )
-    })?;
+        .map_err(|e| format!("Cannot parse chunk size: {e}"))?;
+    let chunk_size = usize::try_from(parse_size_result)
+        .map_err(|e| format!("Cannot parse chunk size (size exceeds usize): {e}"))?;
     Ok(chunk_size)
 }
 
 fn parse_uuid(s: &str) -> Result<uuid::Uuid, String> {
-    let uuid = uuid::Uuid::parse_str(s)
-        .map_err(|e| format!("Cannot parse uuid: {msg}", msg = e.to_string()))?;
+    let uuid = uuid::Uuid::parse_str(s).map_err(|e| format!("Cannot parse uuid: {e}"))?;
     Ok(uuid)
 }

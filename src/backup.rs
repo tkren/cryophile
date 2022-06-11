@@ -28,7 +28,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     // then the output key, potentially containing a path of length >= 1
     let output: &Path = match &backup.output {
         None => Path::new(""),
-        Some(output) => output.as_path().as_ref(),
+        Some(output) => output.as_path(),
     };
 
     let output_dir = build_canonical_path(output)?;
