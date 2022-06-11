@@ -26,7 +26,7 @@ fn on_clap_error(err: clap::error::Error) -> Cli {
 fn main() -> CliResult {
     let cli = Cli::try_parse().unwrap_or_else(on_clap_error);
 
-    if let Err(err) = permafrust::setup() {
+    if let Err(err) = permafrust::setup(cli.debug, cli.quiet) {
         eprintln!("Cannot initialize permafrust: {err}");
         return CliResult::Abort;
     };

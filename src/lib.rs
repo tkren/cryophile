@@ -10,6 +10,7 @@ mod thaw;
 use cli::Cli;
 use cli::Command;
 pub use encoder::FinalEncoder;
+use log::log_enabled;
 pub use split::Split;
 use std::env;
 use std::fmt;
@@ -144,12 +145,29 @@ pub fn base_directory_profile(subcommand: &str) -> Result<xdg::BaseDirectories, 
     }
 }
 
-pub fn setup() -> Result<(), CliError> {
+pub fn setup(debug: usize, quiet: bool) -> Result<(), CliError> {
     // setup logger using environment
     let env = env_logger::Env::new()
         .filter("PERMAFRUST_LOG")
         .write_style("PERMAFRUST_LOG_STYLE");
+
     env_logger::try_init_from_env(env)?;
+
+    match debug {
+        1 if !log_enabled!(log::Level::Debug) => {
+            log::set_max_level(log::LevelFilter::Debug);
+        }
+        (2..) if !log_enabled!(log::Level::Trace) => {
+            log::set_max_level(log::LevelFilter::Trace);
+        }
+        _ => { /* 1 and debug-enabled or 0, 2.. and trace-enabled: noop */ }
+    }
+
+    // prioritize quiet
+    if quiet && log_enabled!(log::Level::Warn) {
+        log::set_max_level(log::LevelFilter::Error);
+    }
+
     Ok(())
 }
 

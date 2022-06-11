@@ -11,11 +11,6 @@ use std::path::{Component, Path, PathBuf};
 
 pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     log::info!("BACKUP...");
-    if cli.debug > 0 {
-        log::debug!("Printing verbose info...");
-    } else if !cli.quiet {
-        log::debug!("Printing normally...");
-    }
 
     let mut backup_dir = PathBuf::new();
 

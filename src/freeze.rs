@@ -10,16 +10,6 @@ pub fn perform_freeze(
     base_directories: &BaseDirectories,
 ) -> io::Result<()> {
     log::info!("FREEZE...");
-    if cli.debug > 0 {
-        log::debug!("Printing verbose info...");
-    } else if !cli.quiet {
-        log::debug!("Printing normally...");
-    }
-
-    let debug = cli.debug > 0;
-    if debug {
-        log::debug!("We debug");
-    }
 
     let state_home = base_directories.get_state_home();
 
