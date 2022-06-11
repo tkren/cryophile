@@ -1,21 +1,19 @@
 use crate::cli::{Cli, Freeze};
-use notify::{RecursiveMode, Watcher};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::io;
 use std::sync::mpsc;
 use xdg::BaseDirectories;
 
 pub fn perform_freeze(
     cli: &Cli,
-    _freeze: &Freeze,
+    freeze: &Freeze,
     base_directories: &BaseDirectories,
 ) -> io::Result<()> {
     log::info!("FREEZE...");
 
-    let state_home = base_directories.get_state_home();
-
     let (tx, rx) = mpsc::channel();
 
-    let mut watcher = match notify::raw_watcher(tx) {
+    let mut watcher = match RecommendedWatcher::new(tx) {
         Ok(notify_watcher) => notify_watcher,
         Err(err) => {
             log::error!("notify watcher failed: {err:?}");
@@ -26,51 +24,46 @@ pub fn perform_freeze(
         }
     };
 
-    if let Err(err) = watcher.watch(state_home, RecursiveMode::Recursive) {
-        log::error!("notify watcher failed: {err:?}");
+    let config = if let Some(config) = &freeze.config {
+        if config.exists() {
+            if let Err(err) = watcher.watch(config, RecursiveMode::NonRecursive) {
+                log::error!("Cannot setup config watcher {config:?} failed: {err:?}");
+                return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
+            }
+        }
+        config.to_path_buf()
+    } else {
+        let default_config = base_directories.get_config_file("permafrust");
+        if let Err(err) = watcher.watch(&default_config, RecursiveMode::NonRecursive) {
+            log::error!("Cannot setup config watcher {default_config:?} failed: {err:?}");
+            return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
+        }
+        default_config
+    };
+
+    log::trace!("Watching config {path}", path = config.display());
+
+    let spool_dir = cli.base.as_ref();
+    if let Err(err) = watcher.watch(spool_dir, RecursiveMode::Recursive) {
+        log::error!("notify watcher {spool_dir:?} failed: {err:?}");
         return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
     }
 
-    loop {
-        let result = rx.recv();
-        if let Err(err) = event_handler(result) {
+    log::trace!("Watching spool {path}", path = cli.base.display());
+
+    for res in rx {
+        if let Err(err) = event_handler(res) {
             return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
         }
     }
+
+    Ok(())
 }
 
-fn event_handler(result: Result<notify::RawEvent, mpsc::RecvError>) -> Result<(), mpsc::RecvError> {
+fn event_handler(result: Result<notify::Event, notify::Error>) -> Result<(), notify::Error> {
     match result {
-        Ok(notify::RawEvent {
-            path: Some(path),
-            op: Ok(notify::Op::CREATE),
-            cookie,
-        }) => {
-            log::debug!("CREATE event: {path:?} {cookie:?}")
-        }
-        Ok(notify::RawEvent {
-            path: Some(path),
-            op: Ok(notify::Op::RENAME),
-            cookie,
-        }) => {
-            log::debug!("RENAME event: {path:?} {cookie:?}")
-        }
-        Ok(notify::RawEvent {
-            path: Some(path),
-            op: Ok(notify::Op::CLOSE_WRITE),
-            cookie,
-        }) => {
-            log::debug!("CLOSE_WRITE event: {path:?} {cookie:?}")
-        }
-        Ok(notify::RawEvent {
-            path: Some(path),
-            op: Ok(op),
-            cookie,
-        }) => {
-            log::trace!("ignored event: {op:?}({path:?}) {cookie:?}")
-        }
-        Ok(broken_event) => {
-            log::error!("broken event: {broken_event:?}");
+        Ok(notify::Event { kind, paths, attrs }) => {
+            log::debug!("Event: {kind:?} {paths:?} {attrs:?}")
         }
         Err(err) => {
             log::error!("watch error: {err:?}");
