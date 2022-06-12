@@ -138,8 +138,8 @@ fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
     }
 }
 
-pub fn base_directory_profile(subcommand: &str) -> Result<xdg::BaseDirectories, CliError> {
-    match xdg::BaseDirectories::with_profile(clap::crate_name!(), subcommand) {
+pub fn base_directory_profile(_subcommand: &str) -> Result<xdg::BaseDirectories, CliError> {
+    match xdg::BaseDirectories::with_prefix(clap::crate_name!()) {
         Ok(base_dirs) => Ok(base_dirs),
         Err(err) => Err(CliError::BaseDirError(err, CliResult::ConfigError)),
     }
