@@ -14,10 +14,12 @@ publish = false
 [dependencies]
 aws-config = "~0.13.0"
 aws-sdk-s3 = "~0.13.0"
+aws-types = "~0.13.0"
 chrono = "~0.4.19"
 clap = { version = "~3.1.18", features = ["cargo", "derive"] }
 crossbeam-channel = "~0.5.4"
 env_logger = "~0.9.0"
+futures = "~0.3.21"
 log = "~0.4.17"
 lz4_flex = "~0.9.3"
 notify = "~5.0.0-pre.15"
@@ -27,6 +29,7 @@ serde = "~1.0.137"
 sha2 = "~0.10.2"
 thiserror = "~1.0.31"
 tokio = { version = "~1.19.2", features = ["full"] }
+toml = "~0.5.9"
 uuid = "~1.1.2"
 xdg = "~2.4.1"
 zstd = "~0.11.2"
