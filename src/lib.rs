@@ -1,3 +1,4 @@
+mod aws;
 mod backup;
 pub mod cli;
 pub mod constants;
