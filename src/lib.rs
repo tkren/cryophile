@@ -1,6 +1,7 @@
 mod aws;
 mod backup;
 pub mod cli;
+pub mod configfile;
 pub mod constants;
 pub mod encoder;
 mod freeze;
