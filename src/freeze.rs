@@ -1,3 +1,4 @@
+use crate::aws;
 use crate::cli::{Cli, Freeze};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::io;
@@ -10,6 +11,13 @@ pub fn perform_freeze(
     base_directories: &BaseDirectories,
 ) -> io::Result<()> {
     log::info!("FREEZE...");
+
+    let aws_config_future = aws::aws_config(None);
+    let aws_config = futures::executor::block_on(aws_config_future);
+    log::trace!(
+        "Using AWS config region {region:?}",
+        region = aws_config.region()
+    );
 
     let (tx, rx) = mpsc::channel();
 
@@ -27,8 +35,7 @@ pub fn perform_freeze(
     let config = if let Some(config) = &freeze.config {
         config.to_path_buf()
     } else {
-        let default_config = base_directories.get_config_file("permafrust.toml");
-        default_config
+        base_directories.get_config_file("permafrust.toml")
     };
 
     if config.exists() {
