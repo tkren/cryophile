@@ -15,7 +15,6 @@ publish = false
 aws-config = "~0.14.0"
 aws-sdk-s3 = "~0.14.0"
 aws-types = "~0.14.0"
-chrono = "~0.4.19"
 clap = { version = "~3.1.18", features = ["cargo", "derive"] }
 crossbeam-channel = "~0.5.4"
 env_logger = "~0.9.0"
@@ -24,11 +23,11 @@ log = "~0.4.17"
 lz4_flex = "~0.9.3"
 notify = "~5.0.0-pre.15"
 parse-size = "~1.0.0"
-sequoia-openpgp = "~1.9.0"
 serde = "~1.0.137"
 serde_derive = "~1.0.137"
 sha2 = "~0.10.2"
 thiserror = "~1.0.31"
+time = "~0.3.11"
 tokio = { version = "~1.19.2", features = ["full"] }
 toml = "~0.5.9"
 uuid = { version = "~1.1.2", features = ["serde"] }
