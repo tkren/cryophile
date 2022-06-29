@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-
 use crate::cli::Backup;
 use crate::cli::Cli;
 use crate::constants::CompressionType;
@@ -36,8 +34,8 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     backup_dir.push(output_dir);
 
     // finally, the current UTC timestamp
-    let utc_now: DateTime<Utc> = Utc::now();
-    let utc_string = utc_now.timestamp().to_string();
+    let utc_now = time::OffsetDateTime::now_utc();
+    let utc_string = utc_now.unix_timestamp().to_string();
     let utc_timestamp = Path::new(&utc_string);
 
     let timestamp_dir = build_canonical_path(utc_timestamp)?;
