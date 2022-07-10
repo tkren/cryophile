@@ -5,6 +5,7 @@ pub mod configfile;
 pub mod constants;
 pub mod encoder;
 mod freeze;
+mod recipient;
 mod restore;
 mod split;
 mod thaw;
