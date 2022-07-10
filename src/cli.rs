@@ -1,4 +1,5 @@
 use crate::constants::{CompressionType, DEFAULT_CHUNK_SIZE, DEFAULT_SPOOL_PATH};
+use crate::recipient::RecipientSpec;
 use clap::{Parser, Subcommand};
 use std::fmt;
 use std::path::PathBuf;
@@ -76,6 +77,12 @@ pub struct Backup {
     #[clap(short, long, help = "output file", parse(from_os_str))]
     pub output: Option<PathBuf>,
 
+    #[clap(short, long, help = "recipient", parse(try_from_str=parse_recipient))]
+    pub recipient: Option<Vec<RecipientSpec>>,
+
+    #[clap(short = 'R', long, help = "recipient file", parse(from_os_str))]
+    pub recipients_file: Option<Vec<PathBuf>>,
+
     #[clap(short, long, help = "chunk size", parse(try_from_str=parse_chunk_size), default_value_t = DEFAULT_CHUNK_SIZE)]
     pub size: usize,
 
@@ -122,4 +129,11 @@ fn parse_chunk_size(s: &str) -> Result<usize, String> {
 fn parse_uuid(s: &str) -> Result<uuid::Uuid, String> {
     let uuid = uuid::Uuid::parse_str(s).map_err(|e| format!("Cannot parse uuid: {e}"))?;
     Ok(uuid)
+}
+
+fn parse_recipient(s: &str) -> Result<RecipientSpec, String> {
+    let recipient = s
+        .parse::<RecipientSpec>()
+        .map_err(|e| format!("Cannot parse age: {e}"))?;
+    Ok(recipient)
 }
