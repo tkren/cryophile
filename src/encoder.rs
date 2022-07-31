@@ -9,7 +9,7 @@ pub trait CompleteEncoder: io::Write {
     }
 }
 
-impl CompleteEncoder for lz4_flex::frame::FrameEncoder<Split> {
+impl<W: io::Write> CompleteEncoder for lz4_flex::frame::FrameEncoder<W> {
     fn complete(&mut self) -> io::Result<()> {
         log::trace!("Complete LZ4 encoder");
         if let Err(err) = self.try_finish() {
@@ -19,7 +19,7 @@ impl CompleteEncoder for lz4_flex::frame::FrameEncoder<Split> {
     }
 }
 
-impl CompleteEncoder for zstd::stream::Encoder<'_, Split> {
+impl<W: io::Write> CompleteEncoder for zstd::stream::Encoder<'_, W> {
     fn complete(&mut self) -> io::Result<()> {
         log::trace!("Complete ZStd encoder");
         if let Err(err) = self.do_finish() {
