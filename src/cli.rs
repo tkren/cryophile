@@ -1,6 +1,11 @@
 use crate::constants::{CompressionType, DEFAULT_CHUNK_SIZE, DEFAULT_SPOOL_PATH};
+use crate::openpgp::openpgp_error;
 use crate::recipient::RecipientSpec;
 use clap::{Parser, Subcommand};
+use sequoia_openpgp::cert::CertParser;
+use sequoia_openpgp::parse::Parse;
+use sequoia_openpgp::Cert;
+use std::collections::VecDeque;
 use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -68,20 +73,20 @@ impl fmt::Display for Command {
 #[derive(Parser, Debug)]
 #[clap(about = "Not shown")]
 pub struct Backup {
-    #[clap(short, long, help = "compression type", parse(try_from_str=parse_compression), default_value_t = CompressionType::default())]
+    #[clap(short = 'C', long, help = "compression type", parse(try_from_str=parse_compression), default_value_t = CompressionType::default())]
     pub compression: CompressionType,
 
     #[clap(short, long, help = "input file", parse(from_os_str))]
     pub input: Option<PathBuf>,
+
+    #[clap(short, long, help = "keyring", required(true), parse(try_from_str=parse_keyring))]
+    pub keyring: VecDeque<Cert>,
 
     #[clap(short, long, help = "output file", parse(from_os_str))]
     pub output: Option<PathBuf>,
 
     #[clap(short, long, help = "recipient", parse(try_from_str=parse_recipient))]
     pub recipient: Option<Vec<RecipientSpec>>,
-
-    #[clap(short = 'R', long, help = "recipient file", parse(from_os_str))]
-    pub recipients_file: Option<Vec<PathBuf>>,
 
     #[clap(short, long, help = "chunk size", parse(try_from_str=parse_chunk_size), default_value_t = DEFAULT_CHUNK_SIZE)]
     pub size: usize,
@@ -136,4 +141,20 @@ fn parse_recipient(s: &str) -> Result<RecipientSpec, String> {
         .parse::<RecipientSpec>()
         .map_err(|e| format!("Cannot parse age: {e}"))?;
     Ok(recipient)
+}
+
+fn parse_keyring(s: &str) -> Result<VecDeque<Cert>, String> {
+    let mut cert_list: VecDeque<Cert> = VecDeque::new();
+    let parser = CertParser::from_file(s).map_err(|e| openpgp_error(e).to_string())?;
+    for parsed_cert in parser {
+        if let Err(err) = parsed_cert {
+            return Err(openpgp_error(err).to_string());
+        }
+        let result: Cert = parsed_cert.unwrap();
+        cert_list.push_back(result);
+    }
+    if cert_list.is_empty() {
+        return Err(format!("Keyring {s} is empty"));
+    }
+    Ok(cert_list)
 }
