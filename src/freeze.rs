@@ -22,7 +22,7 @@ pub fn perform_freeze(
 
     let (tx, rx) = mpsc::channel();
 
-    let mut watcher = match RecommendedWatcher::new(tx) {
+    let mut watcher = match RecommendedWatcher::new(tx, notify::Config::default()) {
         Ok(notify_watcher) => notify_watcher,
         Err(err) => {
             log::error!("notify watcher failed: {err:?}");
