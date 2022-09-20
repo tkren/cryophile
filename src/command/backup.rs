@@ -67,7 +67,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     if backup.keyring.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("Keyring is empty"),
+            "Keyring is empty",
         ));
     }
 
@@ -94,7 +94,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     if cert_list.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("Keyring does not contain storage encryption certificates"),
+            "Keyring does not contain storage encryption certificates",
         ));
     }
 

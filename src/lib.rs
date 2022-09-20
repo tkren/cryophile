@@ -1,14 +1,11 @@
 mod aws;
-mod backup;
 pub mod cli;
+pub mod command;
 pub mod config;
 pub mod encoder;
-mod freeze;
 mod openpgp;
 mod recipient;
-mod restore;
 mod split;
-mod thaw;
 
 use cli::error::CliError;
 use cli::CliResult;
@@ -22,6 +19,11 @@ use std::fs;
 use std::io;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
+
+use crate::command::backup;
+use crate::command::freeze;
+use crate::command::restore;
+use crate::command::thaw;
 
 fn use_dir_atomic_create_maybe(
     dir_path: &Path,
