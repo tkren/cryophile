@@ -1,6 +1,6 @@
 use crate::cli::Backup;
 use crate::cli::Cli;
-use crate::constants::CompressionType;
+use crate::compression::CompressionType;
 use crate::crypto::openpgp::openpgp_error;
 use crate::crypto::openpgp::Keyring;
 use crate::Split;

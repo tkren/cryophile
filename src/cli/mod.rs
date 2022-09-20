@@ -2,9 +2,9 @@ pub mod constants;
 pub mod error;
 pub mod result;
 
-use crate::constants::CompressionType;
-use crate::openpgp::openpgp_error;
-use crate::recipient::RecipientSpec;
+use crate::compression::CompressionType;
+use crate::crypto::age::RecipientSpec;
+use crate::crypto::openpgp::openpgp_error;
 use clap::{Parser, Subcommand};
 use sequoia_openpgp::cert::CertParser;
 use sequoia_openpgp::parse::Parse;

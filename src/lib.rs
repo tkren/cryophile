@@ -1,6 +1,7 @@
 mod aws;
 pub mod cli;
 pub mod command;
+pub mod compression;
 pub mod config;
 mod crypto;
 pub mod encoder;
