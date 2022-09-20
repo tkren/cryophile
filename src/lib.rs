@@ -2,9 +2,8 @@ mod aws;
 pub mod cli;
 pub mod command;
 pub mod config;
+mod crypto;
 pub mod encoder;
-mod openpgp;
-mod recipient;
 mod split;
 
 use cli::error::CliError;

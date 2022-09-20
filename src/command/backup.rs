@@ -1,8 +1,8 @@
 use crate::cli::Backup;
 use crate::cli::Cli;
 use crate::constants::CompressionType;
-use crate::openpgp::openpgp_error;
-use crate::openpgp::Keyring;
+use crate::crypto::openpgp::openpgp_error;
+use crate::crypto::openpgp::Keyring;
 use crate::Split;
 use age::Recipient;
 use sequoia_openpgp::policy::StandardPolicy;
