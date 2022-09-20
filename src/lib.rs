@@ -175,6 +175,21 @@ pub fn setup(debug: usize, quiet: bool) -> Result<(), CliError> {
     Ok(())
 }
 
+pub fn log_versions() {
+    log::debug!(
+        "aws_sdk_s3 version {version:?}",
+        version = aws_sdk_s3::PKG_VERSION
+    );
+    log::debug!(
+        "aws_types version {version:?}",
+        version = aws_types::build_metadata::BUILD_METADATA.core_pkg_version
+    );
+    log::debug!(
+        "sequoia_openpgp version {version:?}",
+        version = sequoia_openpgp::VERSION
+    );
+}
+
 pub fn run(config: &Config) -> Result<(), CliError> {
     // setup base directory
     let base_pathbuf: PathBuf = use_base_dir(&config.base)?;

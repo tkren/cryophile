@@ -31,6 +31,8 @@ fn main() -> CliResult {
         return CliResult::Abort;
     };
 
+    permafrust::log_versions();
+
     let subcommand = cli.command.to_string();
     let base_directories = permafrust::base_directory_profile(&subcommand).unwrap();
 
