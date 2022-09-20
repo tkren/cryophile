@@ -16,6 +16,6 @@ pub async fn aws_config(region: Option<String>) -> SdkConfig {
     aws_config::from_env().region(region_provider).load().await
 }
 
-async fn aws_client(config: &SdkConfig) -> Client {
+pub async fn aws_client(config: &SdkConfig) -> Client {
     Client::new(config)
 }

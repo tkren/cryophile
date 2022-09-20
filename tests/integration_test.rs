@@ -12,7 +12,7 @@ fn test_split_write() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
     println!("tmpdir {tmp_path:?}");
-    let mut splitter = permafrust::Split::new(tmp_path, 3);
+    let mut splitter = permafrust::core::Split::new(tmp_path, 3);
 
     let mut s = String::from("0123456789abcdef");
 
@@ -65,7 +65,7 @@ fn test_split_write_vectored() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
     println!("tmpdir {tmp_path:?}");
-    let mut splitter = permafrust::Split::new(tmp_path, 3);
+    let mut splitter = permafrust::core::Split::new(tmp_path, 3);
 
     let s = String::from("0123456789abcdef");
 
@@ -87,7 +87,7 @@ fn test_copy_to_split() {
     let tmp_path = PathBuf::from(tmp_dir.path());
     println!("tmpdir {tmp_path:?}");
 
-    let mut splitter = permafrust::Split::new(tmp_path, 512);
+    let mut splitter = permafrust::core::Split::new(tmp_path, 512);
 
     let s = String::from("0123456789abcdef");
     let strings = s.repeat(1000);

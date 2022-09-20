@@ -1,9 +1,9 @@
 use crate::cli::Backup;
 use crate::cli::Cli;
 use crate::compression::CompressionType;
+use crate::core::Split;
 use crate::crypto::openpgp::openpgp_error;
 use crate::crypto::openpgp::Keyring;
-use crate::Split;
 use age::Recipient;
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::serialize::stream::Encryptor;

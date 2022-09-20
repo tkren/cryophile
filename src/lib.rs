@@ -1,19 +1,15 @@
-mod aws;
 pub mod cli;
 pub mod command;
 pub mod compression;
 pub mod config;
+pub mod core;
 mod crypto;
-pub mod encoder;
-mod split;
 
 use cli::error::CliError;
 use cli::CliResult;
 use cli::Command;
 pub use config::Config;
-pub use encoder::FinalEncoder;
 use log::log_enabled;
-pub use split::Split;
 use std::env;
 use std::fs;
 use std::io;

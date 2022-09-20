@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::Split;
+use super::Split;
 
 pub trait CompleteEncoder: io::Write {
     fn complete(&mut self) -> io::Result<()> {
