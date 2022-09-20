@@ -1,7 +1,7 @@
 mod aws;
 mod backup;
 pub mod cli;
-pub mod configfile;
+pub mod config;
 pub mod constants;
 pub mod encoder;
 mod freeze;
@@ -11,8 +11,8 @@ mod restore;
 mod split;
 mod thaw;
 
-use cli::Cli;
 use cli::Command;
+pub use config::Config;
 pub use encoder::FinalEncoder;
 use log::log_enabled;
 pub use split::Split;
@@ -23,11 +23,6 @@ use std::io;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 use std::process::{ExitCode, Termination};
-
-pub struct Config {
-    pub base: xdg::BaseDirectories,
-    pub cli: Cli,
-}
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]

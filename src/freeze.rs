@@ -1,6 +1,6 @@
 use crate::aws;
 use crate::cli::{Cli, Freeze};
-use crate::configfile::ConfigFile;
+use crate::config::ConfigFile;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::io;
 use std::sync::mpsc;
