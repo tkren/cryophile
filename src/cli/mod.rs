@@ -1,4 +1,8 @@
-use crate::constants::{CompressionType, DEFAULT_CHUNK_SIZE, DEFAULT_SPOOL_PATH};
+pub mod constants;
+pub mod error;
+pub mod result;
+
+use crate::constants::CompressionType;
 use crate::openpgp::openpgp_error;
 use crate::recipient::RecipientSpec;
 use clap::{Parser, Subcommand};
@@ -9,6 +13,10 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
+
+pub use self::constants::{DEFAULT_CHUNK_SIZE, DEFAULT_SPOOL_PATH};
+pub use self::error::CliError;
+pub use self::result::CliResult;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = clap::crate_description!())]

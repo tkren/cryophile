@@ -1,5 +1,5 @@
 use clap::Parser;
-use permafrust::{cli::Cli, CliError, CliResult, Config};
+use permafrust::{cli::Cli, cli::CliError, cli::CliResult, Config};
 
 fn on_clap_error(err: clap::error::Error) -> Cli {
     err.print().expect("Error writing error");

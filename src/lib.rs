@@ -2,7 +2,6 @@ mod aws;
 mod backup;
 pub mod cli;
 pub mod config;
-pub mod constants;
 pub mod encoder;
 mod freeze;
 mod openpgp;
@@ -11,69 +10,18 @@ mod restore;
 mod split;
 mod thaw;
 
+use cli::error::CliError;
+use cli::CliResult;
 use cli::Command;
 pub use config::Config;
 pub use encoder::FinalEncoder;
 use log::log_enabled;
 pub use split::Split;
 use std::env;
-use std::fmt;
 use std::fs;
 use std::io;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
-use std::process::{ExitCode, Termination};
-
-#[repr(u8)]
-#[derive(Copy, Clone, Debug)]
-pub enum CliResult {
-    Ok = 0,
-    IoError = 42,
-    Usage = 64,
-    LogError = 65,
-    ConfigError = 78,
-    Abort = 255,
-}
-
-impl fmt::Display for CliResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(exit code {})", *self as u8)
-    }
-}
-
-impl Termination for CliResult {
-    fn report(self) -> ExitCode {
-        match self {
-            CliResult::Ok => log::debug!("Terminating without error"),
-            _ => log::error!("Terminating with error(s) {self}"),
-        };
-        ExitCode::from(self as u8)
-    }
-}
-
-#[derive(thiserror::Error, fmt::Debug)]
-pub enum CliError {
-    #[error("BaseDirError: {0} {1}")]
-    BaseDirError(xdg::BaseDirectoriesError, CliResult),
-    #[error("EnvError: {0} {1}")]
-    EnvError(env::VarError, CliResult),
-    #[error("IoError: {0} {1}")]
-    IoError(io::Error, CliResult),
-    #[error("LogError: Cannot call set_logger more than once {1}")]
-    LogError(log::SetLoggerError, CliResult),
-}
-
-impl From<io::Error> for CliError {
-    fn from(error: io::Error) -> Self {
-        CliError::IoError(error, CliResult::IoError)
-    }
-}
-
-impl From<log::SetLoggerError> for CliError {
-    fn from(error: log::SetLoggerError) -> Self {
-        CliError::LogError(error, CliResult::LogError)
-    }
-}
 
 fn use_dir_atomic_create_maybe(
     dir_path: &Path,
