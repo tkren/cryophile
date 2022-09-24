@@ -12,7 +12,6 @@ use sequoia_openpgp::Cert;
 use std::collections::VecDeque;
 use std::fmt;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 pub use self::constants::{DEFAULT_CHUNK_SIZE, DEFAULT_SPOOL_PATH};
 pub use self::error::CliError;
@@ -81,7 +80,7 @@ impl fmt::Display for Command {
 #[derive(Parser, Debug)]
 #[command(about = "Not shown")]
 pub struct Backup {
-    #[arg(short = 'C', long, help = "compression type", value_parser = parse_compression, default_value_t = CompressionType::default())]
+    #[arg(short = 'C', long, help = "compression type", value_enum, default_value_t = CompressionType::default())]
     pub compression: CompressionType,
 
     #[arg(short, long, help = "input file", value_parser = value_parser!(PathBuf))]
@@ -119,12 +118,6 @@ pub struct Thaw {}
 pub struct Restore {
     #[arg(short, long, help = "output file", value_parser = value_parser!(PathBuf))]
     pub output: Option<PathBuf>,
-}
-
-fn parse_compression(s: &str) -> Result<CompressionType, String> {
-    let compression =
-        CompressionType::from_str(s).map_err(|e| format!("Cannot parse compression type: {e}"))?;
-    Ok(compression)
 }
 
 fn parse_chunk_size(s: &str) -> Result<usize, String> {
