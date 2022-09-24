@@ -5,7 +5,7 @@ pub mod result;
 use crate::compression::CompressionType;
 use crate::crypto::age::RecipientSpec;
 use crate::crypto::openpgp::openpgp_error;
-use clap::{Parser, Subcommand};
+use clap::{value_parser, Parser, Subcommand};
 use sequoia_openpgp::cert::CertParser;
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
@@ -19,17 +19,17 @@ pub use self::error::CliError;
 pub use self::result::CliResult;
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = clap::crate_description!())]
-#[clap(propagate_version = true)]
-#[clap(subcommand_required(true))]
-#[clap(arg_required_else_help(true))]
+#[command(author, version, about, long_about = clap::crate_description!())]
+#[command(propagate_version = true)]
+#[command(subcommand_required = true)]
+#[command(arg_required_else_help = true)]
 pub struct Cli {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub command: Command,
 
     /// Spool directory containing all backup and restore state
-    #[clap(
-        short, long, parse(from_os_str),
+    #[arg(
+        short, long, value_parser = value_parser!(PathBuf),
         default_value_os_t = PathBuf::from(DEFAULT_SPOOL_PATH),
         value_name = "FILE",
         help = "Spool directory containing all backup and restore state",
@@ -37,32 +37,32 @@ pub struct Cli {
     pub spool: PathBuf,
 
     /// Print debug information verbosely
-    #[clap(
+    #[arg(
         short,
         long,
-        parse(from_occurrences),
+        action = clap::ArgAction::Count,
         help = "Print debug information verbosely"
     )]
-    pub debug: usize,
+    pub debug: u8,
 
     /// Quiet mode
-    #[clap(short, long, help = "Quiet mode")]
+    #[arg(short, long, help = "Quiet mode")]
     pub quiet: bool,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Queue input for upload
-    #[clap(arg_required_else_help = false)]
+    #[command(arg_required_else_help = false)]
     Backup(Backup),
     /// Upload backup
-    #[clap(arg_required_else_help = false)]
+    #[command(arg_required_else_help = false)]
     Freeze(Freeze),
     /// Download backup
-    #[clap(arg_required_else_help = false)]
+    #[command(arg_required_else_help = false)]
     Thaw(Thaw),
     /// Uncompress and decrypt downloaded backup files
-    #[clap(arg_required_else_help = false)]
+    #[command(arg_required_else_help = false)]
     Restore(Restore),
 }
 
@@ -79,45 +79,45 @@ impl fmt::Display for Command {
 }
 
 #[derive(Parser, Debug)]
-#[clap(about = "Not shown")]
+#[command(about = "Not shown")]
 pub struct Backup {
-    #[clap(short = 'C', long, help = "compression type", parse(try_from_str=parse_compression), default_value_t = CompressionType::default())]
+    #[arg(short = 'C', long, help = "compression type", value_parser = parse_compression, default_value_t = CompressionType::default())]
     pub compression: CompressionType,
 
-    #[clap(short, long, help = "input file", parse(from_os_str))]
+    #[arg(short, long, help = "input file", value_parser = value_parser!(PathBuf))]
     pub input: Option<PathBuf>,
 
-    #[clap(short, long, help = "keyring", required(true), parse(try_from_str=parse_keyring))]
+    #[arg(short, long, help = "keyring", required = true, value_parser = parse_keyring)]
     pub keyring: VecDeque<Cert>,
 
-    #[clap(short, long, help = "output file", parse(from_os_str))]
+    #[arg(short, long, help = "output file", value_parser = value_parser!(PathBuf))]
     pub output: Option<PathBuf>,
 
-    #[clap(short, long, help = "recipient", parse(try_from_str=parse_recipient))]
+    #[arg(short, long, help = "recipient", value_parser = parse_recipient)]
     pub recipient: Option<Vec<RecipientSpec>>,
 
-    #[clap(short, long, help = "chunk size", parse(try_from_str=parse_chunk_size), default_value_t = DEFAULT_CHUNK_SIZE)]
+    #[arg(short, long, help = "chunk size", value_parser = parse_chunk_size, default_value_t = DEFAULT_CHUNK_SIZE)]
     pub size: usize,
 
-    #[clap(short, long, help = "vault", parse(try_from_str=parse_uuid))]
+    #[arg(short, long, help = "vault", value_parser = parse_uuid)]
     pub vault: uuid::Uuid,
 }
 
 #[derive(Parser, Debug)]
-#[clap(about = "Not shown")]
+#[command(about = "Not shown")]
 pub struct Freeze {
-    #[clap(short, long, help = "config file", parse(from_os_str))]
+    #[arg(short, long, help = "config file", value_parser = value_parser!(PathBuf))]
     pub config: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug)]
-#[clap(about = "Not shown")]
+#[command(about = "Not shown")]
 pub struct Thaw {}
 
 #[derive(Parser, Debug)]
-#[clap(about = "Not shown")]
+#[command(about = "Not shown")]
 pub struct Restore {
-    #[clap(short, long, help = "output file", parse(from_os_str))]
+    #[arg(short, long, help = "output file", value_parser = value_parser!(PathBuf))]
     pub output: Option<PathBuf>,
 }
 

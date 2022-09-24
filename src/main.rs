@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{error::ErrorKind, Parser};
 use permafrust::{cli::Cli, cli::CliError, cli::CliResult, Config};
 
 fn on_clap_error(err: clap::error::Error) -> Cli {
@@ -7,9 +7,9 @@ fn on_clap_error(err: clap::error::Error) -> Cli {
     let code: CliResult = match err.use_stderr() {
         true => CliResult::Usage,
         false => match err.kind() {
-            clap::ErrorKind::DisplayHelp => CliResult::Ok,
-            clap::ErrorKind::DisplayVersion => CliResult::Ok,
-            clap::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => CliResult::Usage,
+            ErrorKind::DisplayHelp => CliResult::Ok,
+            ErrorKind::DisplayVersion => CliResult::Ok,
+            ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => CliResult::Usage,
             _ => CliResult::Usage,
         },
     };

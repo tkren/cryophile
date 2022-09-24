@@ -90,7 +90,7 @@ pub fn base_directory_profile(_subcommand: &str) -> Result<xdg::BaseDirectories,
     }
 }
 
-pub fn setup(debug: usize, quiet: bool) -> Result<(), CliError> {
+pub fn setup(debug: u8, quiet: bool) -> Result<(), CliError> {
     // setup logger using environment
     let env = env_logger::Env::new()
         .filter("PERMAFRUST_LOG")
