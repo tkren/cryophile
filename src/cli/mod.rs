@@ -9,7 +9,6 @@ use clap::{value_parser, Parser, Subcommand};
 use sequoia_openpgp::cert::CertParser;
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
-use std::collections::VecDeque;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -86,8 +85,8 @@ pub struct Backup {
     #[arg(short, long, help = "input file", value_parser = value_parser!(PathBuf))]
     pub input: Option<PathBuf>,
 
-    #[arg(short, long, help = "keyring", required = true, value_parser = parse_keyring)]
-    pub keyring: VecDeque<Cert>,
+    #[arg(short, long, help = "keyring", action = clap::ArgAction::Append, required = true, value_parser = parse_keyring)]
+    pub keyring: Vec<Vec<Cert>>,
 
     #[arg(short, long, help = "output file", value_parser = value_parser!(PathBuf))]
     pub output: Option<PathBuf>,
@@ -144,15 +143,15 @@ fn parse_recipient(s: &str) -> Result<RecipientSpec, String> {
     Ok(recipient)
 }
 
-fn parse_keyring(s: &str) -> Result<VecDeque<Cert>, String> {
-    let mut cert_list: VecDeque<Cert> = VecDeque::new();
+fn parse_keyring(s: &str) -> Result<Vec<Cert>, String> {
+    let mut cert_list: Vec<Cert> = Vec::new();
     let parser = CertParser::from_file(s).map_err(|e| openpgp_error(e).to_string())?;
     for parsed_cert in parser {
         if let Err(err) = parsed_cert {
             return Err(openpgp_error(err).to_string());
         }
         let result: Cert = parsed_cert.unwrap();
-        cert_list.push_back(result);
+        cert_list.push(result);
     }
     if cert_list.is_empty() {
         return Err(format!("Keyring {s} is empty"));
