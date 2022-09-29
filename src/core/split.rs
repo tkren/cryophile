@@ -46,10 +46,10 @@ impl Split {
     }
 
     pub fn clear(&mut self) -> io::Result<()> {
+        let result = self.flush();
         self.pos = 0;
         self.tot = 0;
         self.val = 0;
-        let result = self.flush();
         self.file = None;
         self.mark_failed = false;
         result
@@ -131,12 +131,12 @@ impl Split {
             return Ok(0);
         }
 
-        self.use_file_or_next()?;
+        let _remaining_split = self.use_file_or_next()?;
 
-        let file = self.file.as_ref();
+        let mut file = self.file.as_ref().unwrap();
 
         let mut slice = buf;
-        let n = io::copy(&mut slice, &mut file.unwrap())?;
+        let n = io::copy(&mut slice, &mut file)?;
 
         let offset = usize::try_from(n).expect("copied buffer exceeds usize");
 
@@ -164,20 +164,38 @@ impl io::Write for Split {
 
         let remainder = self.num - self.pos;
 
-        let (left, right) = if remainder < buf_len {
-            // buf_len >= remainder: split buf into buf[0..remainder-1], buf[remainder..]
+        let (head, tail) = if remainder < buf_len {
+            // buf_len > remainder: split buf into buf[0..remainder-1], buf[remainder..]
             buf.split_at(remainder)
         } else {
-            // buf_len < remainder: split buf into buf[0..buf_len-1] (buf), buf[buf_len..] ([])
+            // buf_len <= remainder: split buf into buf[0..buf_len-1] (buf), buf[buf_len..] ([])
             buf.split_at(buf_len)
         };
 
-        // write left slice of length remainder or buf_len
-        written += self.write_once(left)?;
+        log::trace!(
+            "Head remaining={remaining:?} prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
+            remaining=remainder,
+            prefix=self.prefix,
+            total_bytes=self.tot,
+            chunks=self.val
+        );
 
-        // write right slice in chunks of length self.num (last chunk at most self.num)
-        for chunk in right.chunks(self.num) {
-            written += self.write_once(chunk)?;
+        // write left slice of length remainder or buf_len
+        written += self.write_once(head)?;
+
+        if !tail.is_empty() {
+            log::trace!(
+                "Tail remaining={remaining:?} prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
+                remaining = buf_len.saturating_sub(remainder),
+                prefix=self.prefix,
+                total_bytes=self.tot,
+                chunks=self.val
+            );
+
+            // write right slice in chunks of length self.num (last chunk at most self.num)
+            for chunk in tail.chunks(self.num) {
+                written += self.write_once(chunk)?;
+            }
         }
 
         assert_eq!(buf_len, written, "buf.len() != written");
@@ -198,9 +216,20 @@ impl io::Write for Split {
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        if self.file.is_some() {
-            return self.file.as_ref().unwrap().flush();
+        match &mut self.file {
+            Some(file) => {
+                log::trace!(
+                    "Attempting flush: prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
+                    prefix=self.prefix,
+                    total_bytes=self.tot,
+                    chunks=self.val
+                );
+                file.flush()
+            }
+            None => {
+                log::trace!("Nothing to flush ...");
+                Ok(())
+            },
         }
-        Ok(())
     }
 }
