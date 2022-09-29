@@ -5,6 +5,7 @@ use crate::core::Split;
 use crate::crypto::openpgp::openpgp_error;
 use crate::crypto::openpgp::Keyring;
 use age::Recipient;
+
 use sequoia_openpgp::policy::StandardPolicy;
 use sequoia_openpgp::serialize::stream::Encryptor;
 use sequoia_openpgp::serialize::stream::LiteralWriter;
@@ -58,12 +59,13 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
         }
     }
 
+    /*
     log::debug!(
         "Age Recipients: {recipients:?}",
         recipients = backup.recipient
     );
     log::debug!("OpenPGP Keyring: {keyring:?}", keyring = backup.keyring);
-
+    */
     if backup.keyring.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -74,7 +76,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     // get certificates from keyring
     let policy = StandardPolicy::new();
     let mut cert_list: Keyring = Vec::new();
-    for cert in &backup.keyring {
+    for cert in backup.keyring.iter().flatten() {
         for storage in cert
             .keys()
             .with_policy(&policy, None)
@@ -83,9 +85,17 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
             .revoked(false)
             .for_storage_encryption()
         {
+            let storage_cert = storage.cert().fingerprint();
+            let subkey = storage.keyid();
+            let mpis = storage.mpis();
+            let algo = mpis.algo().unwrap();
+            let size = mpis.bits().unwrap_or(0);
             log::info!(
-                "Encrypting for storage certificate {storage_cert:?}",
-                storage_cert = storage.cert().fingerprint()
+                "Encrypting for certificate {storage_cert} subkey {subkey} {algo}{size}",
+                storage_cert = storage_cert.to_string(),
+                subkey = subkey.to_string(),
+                algo = algo.to_string(),
+                size = size
             );
             cert_list.push(storage.clone());
         }
@@ -109,15 +119,17 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     // TODO signal handling, Ctrl+C does not finish stream https://rust-cli.github.io/book/in-depth/signals.html
     let splitter = Split::new(backup_dir, backup.size);
 
+    log::trace!("Setting up encryption ...");
     let message = Message::new(splitter);
-
     let encryptor =
         Encryptor::for_recipients(message, cert_list).symmetric_algo(SymmetricAlgorithm::AES256);
 
     // Encrypt the message.
+    log::trace!("Starting encryption ...");
     let message = encryptor.build().map_err(openpgp_error)?;
 
     // Literal wrapping.
+    log::trace!("Setting up encryption stream ...");
     let mut message = LiteralWriter::new(message)
         .format(DataFormat::Binary)
         .build()
