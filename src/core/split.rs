@@ -216,20 +216,16 @@ impl io::Write for Split {
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        match &mut self.file {
-            Some(file) => {
-                log::trace!(
-                    "Attempting flush: prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
-                    prefix=self.prefix,
-                    total_bytes=self.tot,
-                    chunks=self.val
-                );
-                file.flush()
-            }
-            None => {
-                log::trace!("Nothing to flush ...");
-                Ok(())
-            },
-        }
+        let Some(file) = &mut self.file else {
+            log::trace!("Nothing to flush ...");
+            return Ok(())
+        };
+        log::trace!(
+            "Attempting flush: prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
+            prefix = self.prefix,
+            total_bytes = self.tot,
+            chunks = self.val
+        );
+        file.flush()
     }
 }
