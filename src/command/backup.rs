@@ -179,13 +179,6 @@ fn build_reader(path: Option<&PathBuf>) -> io::Result<Box<dyn io::Read>> {
 }
 
 fn build_canonical_path(dir: &Path) -> io::Result<PathBuf> {
-    //if dir.is_empty() {
-    //    return Err(io::Error::new(
-    //        io::ErrorKind::InvalidInput,
-    //        "Empty path given",
-    //    ));
-    // }
-
     let mut canonical_dir_path = PathBuf::new();
 
     // create canonical representation
