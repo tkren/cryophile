@@ -1,7 +1,7 @@
+# Permafrust
+
 ![build](https://github.com/tkren/permafrust/actions/workflows/build.yml/badge.svg)
 ![sec](https://github.com/tkren/permafrust/actions/workflows/sec.yml/badge.svg)
-
-# Permafrust
 
 This is the Permafrust backup daemon.
 
@@ -9,8 +9,9 @@ This is the Permafrust backup daemon.
 dd if=/dev/random count=4096 | PARMAFRUST_LOG_STYLE= PERMAFRUST_LOG=trace cargo run --  -b /tmp backup -v UUID -o DATE
 ```
 
-If notify fails, we need to bump max_user_instances, see https://stackoverflow.com/a/71082431/2982090
-```
+If notify fails, we need to bump max_user_instances, see <https://stackoverflow.com/a/71082431/2982090>
+
+```shell
 sudo sysctl fs.inotify.max_user_instances=512
 ```
 
