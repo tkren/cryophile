@@ -217,7 +217,7 @@ impl io::Write for Split {
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
         let Some(file) = &mut self.file else {
-            log::trace!("Nothing to flush ...");
+            log::trace!("Nothing to flush…");
             return Ok(())
         };
         log::trace!(
