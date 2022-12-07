@@ -21,7 +21,7 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
-    log::info!("BACKUP...");
+    log::info!("BACKUP…");
 
     let backup_dir = build_backup_path(cli, backup)?;
 
@@ -68,7 +68,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     let reader: Box<dyn io::Read> = build_reader(backup.input.as_ref())?;
     let mut buffered_reader = io::BufReader::new(reader);
 
-    log::trace!("Starting backup ...");
+    log::trace!("Starting backup…");
 
     let copy_result = match backup.compression {
         CompressionType::None => io::copy(&mut buffered_reader, &mut encryptor_sink)?,
@@ -106,7 +106,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
 }
 
 fn compressor_worker(reader: &mut dyn io::Read, compressor: &mut dyn io::Write) -> io::Result<u64> {
-    log::trace!("Starting compressor worker ...");
+    log::trace!("Starting compressor worker…");
     io::copy(reader, compressor)
 }
 
@@ -195,17 +195,17 @@ where
     R: IntoIterator,
     R::Item: Into<sequoia_openpgp::serialize::stream::Recipient<'a>>,
 {
-    log::trace!("Setting up encryption ...");
+    log::trace!("Setting up encryption…");
     let message = Message::new(output);
     let encryptor =
         Encryptor::for_recipients(message, recipients).symmetric_algo(SymmetricAlgorithm::AES256);
 
     // Encrypt the message.
-    log::trace!("Starting encryption ...");
+    log::trace!("Starting encryption…");
     let message = encryptor.build().map_err(openpgp_error)?;
 
     // Literal wrapping.
-    log::trace!("Setting up encryption stream ...");
+    log::trace!("Setting up encryption stream…");
     LiteralWriter::new(message)
         .format(DataFormat::Binary)
         .build()
@@ -215,15 +215,15 @@ where
 fn build_reader(path: Option<&PathBuf>) -> io::Result<Box<dyn io::Read>> {
     let reader: Box<dyn io::Read> = match path {
         Some(p) if p.as_path() == Path::new("-") => {
-            log::info!("Reading from stdin ...");
+            log::info!("Reading from stdin…");
             Box::new(io::stdin())
         }
         None => {
-            log::info!("Reading from stdin ...");
+            log::info!("Reading from stdin…");
             Box::new(io::stdin())
         }
         Some(input) => {
-            log::info!("Opening {input:?} ...");
+            log::info!("Opening {input:?}…");
             Box::new(fs::File::open(input)?)
         }
     };

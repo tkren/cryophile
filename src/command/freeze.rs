@@ -11,7 +11,7 @@ pub fn perform_freeze(
     freeze: &Freeze,
     base_directories: &BaseDirectories,
 ) -> io::Result<()> {
-    log::info!("FREEZE...");
+    log::info!("FREEZE…");
 
     let aws_config_future = aws::aws_config(None);
     let aws_config = futures::executor::block_on(aws_config_future);
