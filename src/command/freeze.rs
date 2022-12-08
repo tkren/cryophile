@@ -1,6 +1,7 @@
 use crate::cli::{Cli, Freeze};
 use crate::config::ConfigFile;
 use crate::core::aws;
+use crate::core::notify::notify_error;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::io;
 use std::sync::mpsc;
@@ -20,18 +21,14 @@ pub fn perform_freeze(
         region = aws_config.region()
     );
 
+    let aws_client_future = aws::aws_client(&aws_config);
+    let aws_client = futures::executor::block_on(aws_client_future);
+    log::trace!("Using AWS client {aws_client:?}");
+
     let (tx, rx) = mpsc::channel();
 
-    let mut watcher = match RecommendedWatcher::new(tx, notify::Config::default()) {
-        Ok(notify_watcher) => notify_watcher,
-        Err(err) => {
-            log::error!("notify watcher failed: {err:?}");
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Cannot create notify watcher",
-            ));
-        }
-    };
+    let mut watcher =
+        RecommendedWatcher::new(tx, notify::Config::default()).map_err(notify_error)?;
 
     let config_path = if let Some(config) = &freeze.config {
         config.to_path_buf()
@@ -59,25 +56,19 @@ pub fn perform_freeze(
     log::trace!("Config: {config:#?}");
 
     let spool = cli.spool.as_ref();
-    if let Err(err) = watcher.watch(spool, RecursiveMode::Recursive) {
-        log::error!("notify watcher {spool:?} failed: {err:?}");
-        return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
-    }
+    watcher
+        .watch(spool, RecursiveMode::Recursive)
+        .map_err(notify_error)?;
     log::trace!("Watching spool {path}", path = spool.display());
 
     for res in rx {
-        if let Err(err) = event_handler(res, &config) {
-            return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
-        }
+        event_handler(res).map_err(notify_error)?
     }
 
     Ok(())
 }
 
-fn event_handler(
-    result: Result<notify::Event, notify::Error>,
-    config: &Option<ConfigFile>,
-) -> Result<(), notify::Error> {
+fn event_handler(result: Result<notify::Event, notify::Error>) -> Result<(), notify::Error> {
     match result {
         Ok(notify::Event { kind, paths, attrs }) => {
             log::debug!("Event: {kind:?} {paths:?} {attrs:?}")
