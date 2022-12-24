@@ -13,11 +13,11 @@ publish = false
 
 [dependencies]
 age = { version = "~0.9.0", features = ["ssh"] }
-anyhow = { version = "~1.0.66", features = ["backtrace"] }
-aws-config = "~0.51.0"
-aws-sdk-s3 = "~0.21.0"
-aws-types = "~0.51.0"
-clap = { version = "~4.0.29", features = ["cargo", "derive"] }
+anyhow = { version = "~1.0.68", features = ["backtrace"] }
+aws-config = "~0.52.0"
+aws-sdk-s3 = "~0.22.0"
+aws-types = "~0.52.0"
+clap = { version = "~4.0.32", features = ["cargo", "derive"] }
 crossbeam = "~0.8.2"
 crossbeam-utils = "~0.8.14"
 env_logger = "~0.10.0"
@@ -27,17 +27,17 @@ lz4_flex = "~0.9.5"
 notify = "~5.0.0"
 parse-size = "~1.0.0"
 retry = "~2.0.0"
-serde = "~1.0.148"
-serde_derive = "~1.0.148"
-sequoia-openpgp = "~1.11.0"
-thiserror = "~1.0.37"
+serde = "~1.0.151"
+serde_derive = "~1.0.151"
+sequoia-openpgp = "~1.12.0"
+thiserror = "~1.0.38"
 thread_io = "~0.3.0"
 time = "~0.3.17"
-tokio = { version = "~1.22.0", features = ["full"] }
-toml = "~0.5.9"
+tokio = { version = "~1.23.0", features = ["full"] }
+toml = "~0.5.10"
 uuid = { version = "~1.2.2", features = ["serde"] }
 xdg = "~2.4.1"
-zstd = "~0.12.0"
+zstd = "~0.12.1"
 
 [dev-dependencies]
 tempfile = "~3.3.0"
