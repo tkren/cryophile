@@ -2,6 +2,7 @@ use crate::cli::constants::DEFAULT_BUF_SIZE;
 use crate::cli::Backup;
 use crate::cli::Cli;
 use crate::compression::CompressionType;
+use crate::core::path::BackupPathComponents;
 use crate::core::Split;
 use crate::crypto::openpgp::openpgp_error;
 use crate::crypto::openpgp::Keyring;
@@ -18,12 +19,23 @@ use sequoia_openpgp::Cert;
 use std::fs;
 use std::io;
 use std::io::Write;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     log::info!("BACKUP…");
 
-    let backup_dir = build_backup_path(cli, backup)?;
+    let backup_path_components: BackupPathComponents = (
+        cli.spool.clone(),
+        backup.vault,
+        backup.output.clone(),
+        time::OffsetDateTime::now_utc(),
+    )
+        .into();
+
+    let backup_dir: Option<PathBuf> = (&backup_path_components).into();
+    let Some(backup_dir) = backup_dir else {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid path {backup_path_components:?} given")));
+    };
 
     let mut recipients: Vec<Box<dyn age::Recipient>> = vec![];
     if backup.recipient.is_some() {
@@ -110,42 +122,6 @@ fn compressor_worker(reader: &mut dyn io::Read, compressor: &mut dyn io::Write) 
     io::copy(reader, compressor)
 }
 
-fn build_backup_path(cli: &Cli, backup: &Backup) -> io::Result<PathBuf> {
-    let mut backup_dir = PathBuf::new();
-
-    // backup_dir starts with the spool directory
-    let spool = &cli.spool;
-    backup_dir.push(spool);
-
-    // next we add a vault as lower-case hyphenated UUID
-    let backup_vault_string = backup.vault.to_string();
-    let backup_vault_path = Path::new(&backup_vault_string);
-    let vault_dir = build_canonical_path(backup_vault_path)?;
-    log::trace!("Using vault directory {vault_dir:?}");
-    backup_dir.push(vault_dir);
-
-    // then the output key, potentially containing a path of length >= 1
-    let output: &Path = match &backup.output {
-        None => Path::new(""),
-        Some(output) => output.as_path(),
-    };
-
-    let output_dir = build_canonical_path(output)?;
-    log::trace!("Using output directory {output_dir:?}");
-    backup_dir.push(output_dir);
-
-    // finally, the current UTC timestamp
-    let utc_now = time::OffsetDateTime::now_utc();
-    let utc_string = utc_now.unix_timestamp().to_string();
-    let utc_timestamp = Path::new(&utc_string);
-
-    let timestamp_dir = build_canonical_path(utc_timestamp)?;
-    log::trace!("Using timestamp directory {timestamp_dir:?}");
-    backup_dir.push(timestamp_dir);
-
-    Ok(backup_dir)
-}
-
 fn parse_keyring<'a, K>(policy: &'a dyn Policy, keyring: K) -> io::Result<Keyring<'a>>
 where
     K: Iterator<Item = &'a Cert>,
@@ -228,28 +204,4 @@ fn build_reader(path: Option<&PathBuf>) -> io::Result<Box<dyn io::Read>> {
         }
     };
     Ok(reader)
-}
-
-fn build_canonical_path(dir: &Path) -> io::Result<PathBuf> {
-    let mut canonical_dir_path = PathBuf::new();
-
-    // create canonical representation
-    for component in dir.components() {
-        match component {
-            Component::Normal(subpath) => {
-                canonical_dir_path.push(subpath);
-            }
-            Component::CurDir => {
-                // ignore
-            }
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Invalid path {dir:?} given"),
-                ));
-            }
-        }
-    }
-
-    Ok(canonical_dir_path)
 }
