@@ -1,24 +1,13 @@
-use crate::cli::constants::DEFAULT_BUF_SIZE;
-use crate::cli::Backup;
-use crate::cli::Cli;
+use crate::cli::{constants::DEFAULT_BUF_SIZE, Backup, Cli};
 use crate::compression::CompressionType;
 use crate::core::path::BackupPathComponents;
 use crate::core::Split;
-use crate::crypto::openpgp::openpgp_error;
-use crate::crypto::openpgp::Keyring;
+use crate::crypto::openpgp::{build_encryptor, openpgp_error, parse_keyring, Keyring};
 
-use sequoia_openpgp::policy::Policy;
 use sequoia_openpgp::policy::StandardPolicy;
-use sequoia_openpgp::serialize::stream::Encryptor;
-use sequoia_openpgp::serialize::stream::LiteralWriter;
-use sequoia_openpgp::serialize::stream::Message;
-use sequoia_openpgp::types::DataFormat;
-use sequoia_openpgp::types::SymmetricAlgorithm;
-use sequoia_openpgp::Cert;
 
 use std::fs;
-use std::io;
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
@@ -120,72 +109,6 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
 fn compressor_worker(reader: &mut dyn io::Read, compressor: &mut dyn io::Write) -> io::Result<u64> {
     log::trace!("Starting compressor worker…");
     io::copy(reader, compressor)
-}
-
-fn parse_keyring<'a, K>(policy: &'a dyn Policy, keyring: K) -> io::Result<Keyring<'a>>
-where
-    K: Iterator<Item = &'a Cert>,
-{
-    // get certificates from keyring
-    let mut cert_list: Keyring = Vec::new();
-    for cert in keyring {
-        for storage in cert
-            .keys()
-            .with_policy(policy, None)
-            .supported()
-            .alive()
-            .revoked(false)
-            .for_storage_encryption()
-        {
-            let storage_cert = storage.cert().fingerprint();
-            let subkey = storage.keyid();
-            let mpis = storage.mpis();
-            let algo = mpis.algo().unwrap();
-            let size = mpis.bits().unwrap_or(0);
-            log::info!(
-                "Encrypting for certificate {storage_cert} subkey {subkey} {algo}{size}",
-                storage_cert = storage_cert.to_string(),
-                subkey = subkey.to_string(),
-                algo = algo.to_string(),
-                size = size
-            );
-            cert_list.push(storage.clone());
-        }
-    }
-
-    if cert_list.is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Keyring does not contain storage encryption certificates",
-        ));
-    }
-
-    Ok(cert_list)
-}
-
-fn build_encryptor<'a, R, W: 'a + io::Write + Send + Sync>(
-    recipients: R,
-    output: W,
-) -> io::Result<Message<'a>>
-where
-    R: IntoIterator,
-    R::Item: Into<sequoia_openpgp::serialize::stream::Recipient<'a>>,
-{
-    log::trace!("Setting up encryption…");
-    let message = Message::new(output);
-    let encryptor =
-        Encryptor::for_recipients(message, recipients).symmetric_algo(SymmetricAlgorithm::AES256);
-
-    // Encrypt the message.
-    log::trace!("Starting encryption…");
-    let message = encryptor.build().map_err(openpgp_error)?;
-
-    // Literal wrapping.
-    log::trace!("Setting up encryption stream…");
-    LiteralWriter::new(message)
-        .format(DataFormat::Binary)
-        .build()
-        .map_err(openpgp_error)
 }
 
 fn build_reader(path: Option<&PathBuf>) -> io::Result<Box<dyn io::Read>> {
