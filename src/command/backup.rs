@@ -57,7 +57,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     // mkdir -p backup_dir: let the first instance of two concurrent
     // permafrust backup calls win in case they started with the same timestamp
     // https://rcrowley.org/2010/01/06/things-unix-can-do-atomically.html
-    crate::use_dir_atomic_create_maybe(&backup_dir, Some(true), Some(true))?;
+    crate::core::path::use_dir_atomic_create_maybe(&backup_dir, Some(true), Some(true))?;
 
     // TODO signal handling, Ctrl+C does not finish stream https://rust-cli.github.io/book/in-depth/signals.html
     let mut splitter = Split::new(backup_dir, backup.size);

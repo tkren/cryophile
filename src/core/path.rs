@@ -1,4 +1,8 @@
-use std::path::{Component, Path, PathBuf};
+use std::{
+    fs, io,
+    os::unix::fs::DirBuilderExt,
+    path::{Component, Path, PathBuf},
+};
 
 use uuid::Uuid;
 
@@ -89,5 +93,67 @@ impl From<&BackupPathComponents> for Option<PathBuf> {
         backup_dir.push(timestamp_dir);
 
         Some(backup_dir)
+    }
+}
+
+pub(crate) fn use_dir_atomic_create_maybe(
+    dir_path: &Path,
+    create_dir: Option<bool>,
+    recursive: Option<bool>,
+) -> io::Result<()> {
+    if create_dir.unwrap_or(false) {
+        log::info!("Creating directory {dir_path:?}");
+        // first mkdir the parent path, ignoring if it exists, and then perfrom
+        // atomic creation of the final element in dir_path
+        // https://rcrowley.org/2010/01/06/things-unix-can-do-atomically.html
+        let mut builder = fs::DirBuilder::new();
+        builder.mode(0o755);
+
+        builder.recursive(recursive.unwrap_or(false));
+        if let Some(parent) = dir_path.parent() {
+            builder.create(parent).map_err(|err| {
+                io::Error::new(
+                    err.kind(),
+                    format!("Cannot create {path:?}: {err}", path = parent.display()),
+                )
+            })?;
+        }
+
+        // force failure if full dir_path already exists
+        builder.recursive(false);
+        builder.create(dir_path).map_err(|err| {
+            io::Error::new(
+                err.kind(),
+                format!("Cannot create {path:?}: {err}", path = dir_path.display()),
+            )
+        })?;
+    } else if let Err(err) = fs::read_dir(dir_path) {
+        // PermissionDenied, NotADirectory, NotFound, etc.
+        log::error!("Cannot use directory {dir_path:?}");
+        return Err(err);
+    }
+
+    Ok(())
+}
+
+pub(crate) fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
+    let state_home = base.get_state_home();
+    match fs::metadata(&state_home) {
+        Err(_err) => {
+            log::info!("Creating state directory {state_home:?}");
+            match base.create_state_directory("") {
+                Ok(state_path) => Ok(state_path),
+                Err(err) => Err(err),
+            }
+        }
+        Ok(metadata) => {
+            if !metadata.is_dir() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("Base state home {state_home:?} is not an existing directory"),
+                ));
+            }
+            Ok(state_home)
+        }
     }
 }
