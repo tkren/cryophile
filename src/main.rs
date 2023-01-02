@@ -33,8 +33,7 @@ fn main() -> CliResult {
 
     permafrust::log_versions();
 
-    let subcommand = cli.command.to_string();
-    let base_directories = permafrust::base_directory_profile(&subcommand).unwrap();
+    let base_directories = permafrust::base_directory_profile(&cli.command).unwrap();
 
     let config = Config {
         base: base_directories,
