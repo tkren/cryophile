@@ -17,6 +17,7 @@ use crate::command::backup;
 use crate::command::freeze;
 use crate::command::restore;
 use crate::command::thaw;
+use crate::core::path::CreateDirectory;
 
 pub fn base_directory_profile(_subcommand: &Command) -> Result<xdg::BaseDirectories, CliError> {
     match xdg::BaseDirectories::with_prefix(clap::crate_name!()) {
@@ -72,7 +73,7 @@ pub fn run(config: &Config) -> Result<(), CliError> {
     log::trace!("Using base state directory {base_pathbuf:?}");
 
     let spool = &config.cli.spool;
-    core::path::use_dir_atomic_create_maybe(spool, None, None)?;
+    core::path::use_dir_atomic_create_maybe(spool, CreateDirectory::No)?;
     log::trace!("Using spool directory {spool:?}");
 
     // perform requested command

@@ -96,21 +96,28 @@ impl From<&BackupPathComponents> for Option<PathBuf> {
     }
 }
 
+#[derive(Debug, Default, PartialEq)]
+pub(crate) enum CreateDirectory {
+    #[default]
+    No,
+    NonRecursive,
+    Recursive,
+}
+
 pub(crate) fn use_dir_atomic_create_maybe(
     dir_path: &Path,
-    create_dir: Option<bool>,
-    recursive: Option<bool>,
+    create_dir: CreateDirectory,
 ) -> io::Result<()> {
-    if create_dir.unwrap_or(false) {
+    if create_dir != CreateDirectory::No {
         log::info!("Creating directory {dir_path:?}");
-        // first mkdir the parent path, ignoring if it exists, and then perfrom
+        // first mkdir the parent path, ignoring if it exists, and then perform
         // atomic creation of the final element in dir_path
         // https://rcrowley.org/2010/01/06/things-unix-can-do-atomically.html
         let mut builder = fs::DirBuilder::new();
         builder.mode(0o755);
 
-        builder.recursive(recursive.unwrap_or(false));
         if let Some(parent) = dir_path.parent() {
+            builder.recursive(create_dir != CreateDirectory::NonRecursive);
             builder.create(parent).map_err(|err| {
                 io::Error::new(
                     err.kind(),
