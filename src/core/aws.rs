@@ -1,5 +1,5 @@
 use aws_config::meta::region::RegionProviderChain;
-use aws_sdk_s3::{Client, Region};
+use aws_sdk_s3::{config::Region, Client};
 use aws_types::SdkConfig;
 use log::log_enabled;
 
