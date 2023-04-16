@@ -55,7 +55,7 @@ pub fn setup(debug: u8, quiet: bool) -> Result<(), CliError> {
 pub fn log_versions() {
     log::debug!(
         "aws_sdk_s3 version {version:?}",
-        version = aws_sdk_s3::PKG_VERSION
+        version = aws_sdk_s3::meta::PKG_VERSION
     );
     log::debug!(
         "aws_types version {version:?}",
