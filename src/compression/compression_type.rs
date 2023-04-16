@@ -1,14 +1,9 @@
 use clap::ValueEnum;
 
-#[derive(Clone, Copy, Debug, ValueEnum)]
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
 pub enum CompressionType {
+    #[default]
     None,
     Lz4,
     Zstd,
-}
-
-impl Default for CompressionType {
-    fn default() -> Self {
-        CompressionType::None
-    }
 }
