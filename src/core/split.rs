@@ -1,7 +1,11 @@
 use std::fs;
 use std::io;
 use std::io::Write;
+use std::os::unix::prelude::OpenOptionsExt;
+use std::path::Path;
 use std::path::PathBuf;
+
+use crate::core::constants::CHUNK_FILE_MODE;
 
 pub struct Split {
     num: usize,             // maximum size of each split
@@ -33,13 +37,13 @@ impl Drop for Split {
 }
 
 impl Split {
-    pub fn new(prefix: PathBuf, num: usize) -> Self {
+    pub fn new(prefix_path: &Path, chunk_prefix: &str, num: usize) -> Self {
         Split {
             num,
             pos: 0,
             tot: 0,
             val: 0,
-            prefix,
+            prefix: prefix_path.join(chunk_prefix),
             file: None,
             mark_failed: false,
         }
@@ -60,8 +64,7 @@ impl Split {
     }
 
     fn current_path_buf(&mut self) -> PathBuf {
-        self.prefix
-            .join(format!("chunk.{chunk_seq}", chunk_seq = self.val))
+        self.prefix.with_extension(self.val.to_string())
     }
 
     fn use_file_or_next(&mut self) -> io::Result<usize> {
@@ -94,6 +97,7 @@ impl Split {
         self.file = match fs::File::options()
             .write(true)
             .create_new(true)
+            .mode(CHUNK_FILE_MODE)
             .open(file_path)
         {
             Ok(file) => Some(file),
