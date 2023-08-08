@@ -2345,6 +2345,7 @@ dependencies = [
  "tokio",
  "toml 0.7.6",
  "uuid",
+ "walkdir",
  "xdg",
  "zstd",
 ]
