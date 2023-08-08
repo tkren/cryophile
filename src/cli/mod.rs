@@ -23,7 +23,7 @@ pub struct Cli {
 
     /// Spool directory containing all backup and restore state
     #[arg(
-        short, long, value_parser = value_parser!(PathBuf),
+        short = 'S', long, value_parser = value_parser!(PathBuf),
         default_value_os_t = PathBuf::from(DEFAULT_SPOOL_PATH),
         value_name = "FILE",
         help = "Spool directory containing all backup and restore state",
