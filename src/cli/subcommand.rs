@@ -74,8 +74,14 @@ pub struct Thaw {}
 #[derive(Parser, Debug)]
 #[command(about = "Not shown")]
 pub struct Restore {
+    #[arg(short, long, help = "keyring", action = clap::ArgAction::Append, required = true, value_parser = parse_keyring)]
+    pub keyring: Vec<Vec<Cert>>,
+
     #[arg(short, long, help = "output file", value_parser = value_parser!(PathBuf))]
     pub output: Option<PathBuf>,
+
+    #[arg(short, long, help = "prefix path in vault", value_parser = value_parser!(PathBuf))]
+    pub prefix: Option<PathBuf>,
 
     #[arg(short, long, help = "vault", value_parser = parse_uuid)]
     pub vault: uuid::Uuid,
