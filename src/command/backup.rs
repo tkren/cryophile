@@ -74,33 +74,42 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     log::trace!("Starting backup…");
 
     let copy_result = match backup.compression {
-        CompressionType::None => io::copy(&mut buffered_reader, &mut encryptor_sink)?,
-        CompressionType::Zstd => thread_io::write::writer(
-            DEFAULT_BUF_SIZE,
-            1,
-            &mut encryptor_sink,
-            |writer| -> io::Result<u64> {
-                let mut zstd_encoder = zstd::stream::Encoder::new(writer, 0)?;
-                let result = compressor_worker(&mut buffered_reader, &mut zstd_encoder);
-                if result.is_ok() {
-                    zstd_encoder.do_finish()?
-                }
-                result
-            },
-        )?,
-        CompressionType::Lz4 => thread_io::write::writer(
-            DEFAULT_BUF_SIZE,
-            1,
-            &mut encryptor_sink,
-            |writer| -> io::Result<u64> {
-                let mut lz4_encoder = lz4_flex::frame::FrameEncoder::new(writer);
-                let result = compressor_worker(&mut buffered_reader, &mut lz4_encoder);
-                if result.is_ok() {
-                    lz4_encoder.try_finish()?
-                }
-                result
-            },
-        )?,
+        CompressionType::None => {
+            log::info!("Using no compression…");
+            io::copy(&mut buffered_reader, &mut encryptor_sink)?
+        }
+        CompressionType::Zstd => {
+            log::info!("Using Zstandard compression…");
+            thread_io::write::writer(
+                DEFAULT_BUF_SIZE,
+                1,
+                &mut encryptor_sink,
+                |writer| -> io::Result<u64> {
+                    let mut zstd_encoder = zstd::stream::Encoder::new(writer, 0)?;
+                    let result = compressor_worker(&mut buffered_reader, &mut zstd_encoder);
+                    if result.is_ok() {
+                        zstd_encoder.do_finish()?
+                    }
+                    result
+                },
+            )?
+        }
+        CompressionType::Lz4 => {
+            log::info!("Using LZ4 compression…");
+            thread_io::write::writer(
+                DEFAULT_BUF_SIZE,
+                1,
+                &mut encryptor_sink,
+                |writer| -> io::Result<u64> {
+                    let mut lz4_encoder = lz4_flex::frame::FrameEncoder::new(writer);
+                    let result = compressor_worker(&mut buffered_reader, &mut lz4_encoder);
+                    if result.is_ok() {
+                        lz4_encoder.try_finish()?
+                    }
+                    result
+                },
+            )?
+        }
     };
 
     log::trace!("Wrote total of {copy_result} bytes");
