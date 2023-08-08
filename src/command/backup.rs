@@ -1,5 +1,6 @@
 use crate::cli::{constants::DEFAULT_BUF_SIZE, Backup, Cli};
 use crate::compression::CompressionType;
+use crate::core::constants::{CHUNK_FILE_MODE, CHUNK_FILE_PREFIX};
 use crate::core::path::{use_dir_atomic_create_maybe, BackupPathComponents, CreateDirectory};
 use crate::core::Split;
 use crate::crypto::openpgp::{build_encryptor, openpgp_error, parse_keyring, Keyring};
@@ -8,6 +9,7 @@ use sequoia_openpgp::policy::StandardPolicy;
 
 use std::fs;
 use std::io::{self, Write};
+use std::os::unix::prelude::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 
 pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
@@ -60,7 +62,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     use_dir_atomic_create_maybe(&backup_dir, CreateDirectory::Recursive)?;
 
     // TODO signal handling, Ctrl+C does not finish stream https://rust-cli.github.io/book/in-depth/signals.html
-    let mut splitter = Split::new(backup_dir, backup.size);
+    let mut splitter = Split::new(&backup_dir, CHUNK_FILE_PREFIX, backup.size);
 
     let mut encryptor_sink = build_encryptor(cert_list, &mut splitter)?;
 
@@ -103,7 +105,20 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
 
     log::trace!("Wrote total of {copy_result} bytes");
     encryptor_sink.flush()?;
-    encryptor_sink.finalize().map_err(openpgp_error)
+    encryptor_sink.finalize().map_err(openpgp_error)?;
+    drop(splitter);
+    touch_zero_file(&backup_dir)
+}
+
+fn touch_zero_file(prefix: &Path) -> io::Result<()> {
+    let zero_file = prefix.join(CHUNK_FILE_PREFIX).with_extension("0");
+    log::trace!("Touch {zero_file:?}");
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(CHUNK_FILE_MODE)
+        .open(zero_file)?;
+    Ok(())
 }
 
 fn compressor_worker(reader: &mut dyn io::Read, compressor: &mut dyn io::Write) -> io::Result<u64> {
