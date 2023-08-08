@@ -47,8 +47,8 @@ pub struct Backup {
     #[arg(short, long, help = "keyring", action = clap::ArgAction::Append, required = true, value_parser = parse_keyring)]
     pub keyring: Vec<Vec<Cert>>,
 
-    #[arg(short, long, help = "output path in vault", value_parser = value_parser!(PathBuf))]
-    pub output: Option<PathBuf>,
+    #[arg(short, long, help = "prefix path in vault", value_parser = value_parser!(PathBuf))]
+    pub prefix: Option<PathBuf>,
 
     #[arg(short, long, help = "recipient", value_parser = parse_recipient)]
     pub recipient: Option<Vec<RecipientSpec>>,

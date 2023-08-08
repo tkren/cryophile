@@ -18,7 +18,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     let backup_path_components: BackupPathComponents = (
         cli.spool.clone(),
         backup.vault,
-        backup.output.clone(),
+        backup.prefix.clone(),
         time::OffsetDateTime::now_utc(),
     )
         .into();

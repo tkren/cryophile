@@ -31,16 +31,16 @@ fn build_canonical_path(dir: &Path) -> Option<PathBuf> {
 pub struct BackupPathComponents {
     pub spool: PathBuf,
     pub vault: Uuid,
-    pub output: Option<PathBuf>,
+    pub prefix: Option<PathBuf>,
     pub timestamp: Option<time::OffsetDateTime>,
 }
 
 impl From<(PathBuf, Uuid, Option<PathBuf>)> for BackupPathComponents {
-    fn from((spool, vault, output): (PathBuf, Uuid, Option<PathBuf>)) -> Self {
+    fn from((spool, vault, prefix): (PathBuf, Uuid, Option<PathBuf>)) -> Self {
         Self {
             spool,
             vault,
-            output,
+            prefix,
             ..Self::default()
         }
     }
@@ -48,12 +48,12 @@ impl From<(PathBuf, Uuid, Option<PathBuf>)> for BackupPathComponents {
 
 impl From<(PathBuf, Uuid, Option<PathBuf>, time::OffsetDateTime)> for BackupPathComponents {
     fn from(
-        (spool, vault, output, timestamp): (PathBuf, Uuid, Option<PathBuf>, time::OffsetDateTime),
+        (spool, vault, prefix, timestamp): (PathBuf, Uuid, Option<PathBuf>, time::OffsetDateTime),
     ) -> Self {
         Self {
             spool,
             vault,
-            output,
+            prefix,
             timestamp: Some(timestamp),
         }
     }
@@ -73,15 +73,16 @@ impl From<&BackupPathComponents> for Option<PathBuf> {
         log::trace!("Using vault directory {vault_dir:?}");
         backup_dir.push(vault_dir);
 
-        // then the output key, potentially containing a path of length >= 1
-        let output = match &backup_components.output {
-            Some(output) => output.as_path(),
-            _ => Path::new(""),
+        // then the prefix key, potentially containing a path of length >= 1
+        let prefix_path = if let Some(prefix) = &backup_components.prefix {
+            prefix.as_path()
+        } else {
+            Path::new("")
         };
 
-        let Some(output_dir) = build_canonical_path(output) else {return None;};
-        log::trace!("Using output directory {output_dir:?}");
-        backup_dir.push(output_dir);
+        let Some(prefix_dir) = build_canonical_path(prefix_path) else {return None;};
+        log::trace!("Using prefix path {prefix_dir:?}");
+        backup_dir.push(prefix_dir);
 
         // finally, the current UTC timestamp
         let Some(ts) = backup_components.timestamp else {return Some(backup_dir);};
