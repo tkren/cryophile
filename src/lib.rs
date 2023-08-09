@@ -9,7 +9,7 @@ use cli::error::CliError;
 use cli::CliResult;
 use cli::Command;
 pub use config::Config;
-use log::log_enabled;
+use env_logger::Builder;
 use std::env;
 use std::path::PathBuf;
 
@@ -27,28 +27,19 @@ pub fn base_directory_profile(_subcommand: &Command) -> Result<xdg::BaseDirector
 }
 
 pub fn setup(debug: u8, quiet: bool) -> Result<(), CliError> {
-    // setup logger using environment
-    let env = env_logger::Env::new()
-        .filter("PERMAFRUST_LOG")
-        .write_style("PERMAFRUST_LOG_STYLE");
-
-    env_logger::try_init_from_env(env)?;
-
-    match debug {
-        1 if !log_enabled!(log::Level::Debug) => {
-            log::set_max_level(log::LevelFilter::Debug);
+    // setup logger using environment:
+    // prioritize command-line args over environment variables, and quiet over debug
+    let env = env_logger::Env::new().write_style("PERMAFRUST_LOG_STYLE");
+    let env = if quiet {
+        env.filter_or("", "error")
+    } else {
+        match debug {
+            1 => env.filter_or("", "debug"),
+            (2..) => env.filter_or("", "trace"),
+            _ => env.filter_or("PERMAFRUST_LOG", "info"),
         }
-        (2..) if !log_enabled!(log::Level::Trace) => {
-            log::set_max_level(log::LevelFilter::Trace);
-        }
-        _ => { /* 1 and debug-enabled or 0, 2.. and trace-enabled: noop */ }
-    }
-
-    // prioritize quiet
-    if quiet && log_enabled!(log::Level::Warn) {
-        log::set_max_level(log::LevelFilter::Error);
-    }
-
+    };
+    Builder::new().parse_env(env).try_init()?;
     Ok(())
 }
 
