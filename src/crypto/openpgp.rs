@@ -40,7 +40,7 @@ pub fn openpgp_error(e: anyhow::Error) -> io::Error {
     io::Error::new(io::ErrorKind::Other, format!("OpenPGP error: {e}"))
 }
 
-pub fn parse_keyring<'a, K>(policy: &'a dyn Policy, keyring: K) -> io::Result<Keyring<'a>>
+pub fn storage_encryption_certs<'a, K>(policy: &'a dyn Policy, keyring: K) -> io::Result<Keyring<'a>>
 where
     K: Iterator<Item = &'a Cert>,
 {

@@ -12,7 +12,7 @@ use crate::compression::CompressionType;
 use crate::core::constants::{CHUNK_FILE_MODE, CHUNK_FILE_PREFIX};
 use crate::core::path::{use_dir_atomic_create_maybe, CreateDirectory, Queue, SpoolPathComponents};
 use crate::core::Split;
-use crate::crypto::openpgp::{build_encryptor, openpgp_error, parse_keyring, Keyring};
+use crate::crypto::openpgp::{build_encryptor, openpgp_error, storage_encryption_certs, Keyring};
 
 use sequoia_openpgp::policy::StandardPolicy;
 
@@ -63,7 +63,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
 
     // get certificates from keyring
     let policy = StandardPolicy::new();
-    let cert_list: Keyring = parse_keyring(&policy, backup.keyring.iter().flatten())?;
+    let cert_list: Keyring = storage_encryption_certs(&policy, backup.keyring.iter().flatten())?;
 
     // setup backup directory and splitter encryption sink
     // after we have some certificates for storage encryption
