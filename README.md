@@ -21,8 +21,8 @@ sudo sysctl fs.inotify.max_user_instances=512
 ## Generate encryption key and certificate
 
 ```shell
-sq key generate --cipher-suite cv25519 --can-encrypt storage --cannot-authenticate --cannot-sign --export permafrust-key.pgp
-sq key extract-cert -o permafrust-cert.pgp permafrust-key.pgp
+sq key generate --cipher-suite cv25519 --can-encrypt storage --cannot-authenticate --cannot-sign --output permafrust-key.pgp
+sq key extract-cert --output permafrust-cert.pgp permafrust-key.pgp
 ```
 
 ```shell
