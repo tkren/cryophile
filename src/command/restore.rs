@@ -104,21 +104,21 @@ fn fragment_worker(
 fn send_or_push_fragment(
     sender: &Sender<Option<Fragment>>,
     heap: &mut BinaryHeap<Fragment>,
-    fragment: &Fragment,
+    fragment: Fragment,
     priority: Reverse<i32>,
 ) -> io::Result<Reverse<i32>> {
     if fragment.priority == priority {
         log::trace!("Sending fragment {fragment}");
         let Reverse(prio) = fragment.priority;
         sender
-            .send(Some(fragment.to_owned()))
+            .send(Some(fragment))
             .map_err(channel_send_error)?;
         Ok(Reverse(prio + 1))
     } else {
         log::debug!(
             "Ignoring fragment {fragment}, waiting for new fragment with priority {priority:?}"
         );
-        heap.push(fragment.to_owned());
+        heap.push(fragment);
         Ok(priority)
     }
 }
@@ -165,7 +165,7 @@ fn notify_event_worker(
                     current_priority = send_or_push_fragment(
                         sender,
                         &mut heap,
-                        &current_fragment,
+                        current_fragment,
                         current_priority,
                     )?;
                 }
@@ -197,7 +197,7 @@ fn notify_event_worker(
                 break; // empty heap
             };
             let next_priority =
-                send_or_push_fragment(sender, &mut heap, &min_fragment, current_priority)?;
+                send_or_push_fragment(sender, &mut heap, min_fragment, current_priority)?;
             if next_priority == current_priority {
                 break; // we need to wait for the next fragment with current_priority
             } else {
