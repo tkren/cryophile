@@ -37,14 +37,14 @@ fn build_canonical_path(dir: &Path) -> Option<PathBuf> {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct BackupPathComponents {
+pub struct SpoolPathComponents {
     pub spool: PathBuf,
     pub vault: Uuid,
     pub prefix: Option<PathBuf>,
     pub timestamp: Option<time::OffsetDateTime>,
 }
 
-impl From<(PathBuf, Uuid, Option<PathBuf>)> for BackupPathComponents {
+impl From<(PathBuf, Uuid, Option<PathBuf>)> for SpoolPathComponents {
     fn from((spool, vault, prefix): (PathBuf, Uuid, Option<PathBuf>)) -> Self {
         Self {
             spool,
@@ -55,7 +55,7 @@ impl From<(PathBuf, Uuid, Option<PathBuf>)> for BackupPathComponents {
     }
 }
 
-impl From<(PathBuf, Uuid, Option<PathBuf>, time::OffsetDateTime)> for BackupPathComponents {
+impl From<(PathBuf, Uuid, Option<PathBuf>, time::OffsetDateTime)> for SpoolPathComponents {
     fn from(
         (spool, vault, prefix, timestamp): (PathBuf, Uuid, Option<PathBuf>, time::OffsetDateTime),
     ) -> Self {
@@ -68,22 +68,45 @@ impl From<(PathBuf, Uuid, Option<PathBuf>, time::OffsetDateTime)> for BackupPath
     }
 }
 
-impl From<&BackupPathComponents> for Option<PathBuf> {
-    fn from(backup_components: &BackupPathComponents) -> Self {
+#[derive(Debug, Default)]
+pub enum Queue {
+    #[default]
+    Backup,
+    Freeze,
+    Thaw,
+    Restore,
+}
+
+impl From<Queue> for PathBuf {
+    fn from(queue: Queue) -> Self {
+        PathBuf::from(match queue {
+            Queue::Backup => "backup",
+            Queue::Freeze => "freeze",
+            Queue::Thaw => "thaw",
+            Queue::Restore => "restore",
+        })
+    }
+}
+
+impl SpoolPathComponents {
+    pub fn to_queue_path(&self, queue: Queue) -> Option<PathBuf> {
         let mut backup_dir = PathBuf::new();
 
         // backup_dir starts with the spool directory
-        backup_dir.push(&backup_components.spool);
+        backup_dir.push(&self.spool);
+
+        // next up: queue path
+        backup_dir.push::<PathBuf>(queue.into());
 
         // next we add a vault as lower-case hyphenated UUID
-        let vault_string = &backup_components.vault.to_string();
+        let vault_string = &self.vault.to_string();
         let backup_vault_path = Path::new(vault_string);
         let Some(vault_dir) = build_canonical_path(backup_vault_path) else {return None;};
         log::trace!("Using vault directory {vault_dir:?}");
         backup_dir.push(vault_dir);
 
         // then the prefix key, potentially containing a path of length >= 1
-        let prefix_path = if let Some(prefix) = &backup_components.prefix {
+        let prefix_path = if let Some(prefix) = &self.prefix {
             prefix.as_path()
         } else {
             Path::new("")
@@ -94,7 +117,7 @@ impl From<&BackupPathComponents> for Option<PathBuf> {
         backup_dir.push(prefix_dir);
 
         // finally, the current UTC timestamp
-        let Some(ts) = backup_components.timestamp else {return Some(backup_dir);};
+        let Some(ts) = &self.timestamp else {return Some(backup_dir);};
         let utc_string = ts.unix_timestamp().to_string();
         let utc_timestamp = Path::new(&utc_string);
 
