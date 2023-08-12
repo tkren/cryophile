@@ -10,13 +10,13 @@
 use crate::cli::{Cli, Restore};
 use crate::core::fragment::Fragment;
 use crate::core::notify::notify_error;
-use crate::core::path::BackupPathComponents;
+use crate::core::path::{Queue, SpoolPathComponents};
 use crossbeam::channel::{Receiver, Sender};
 use notify::event::{AccessKind, AccessMode, CreateKind};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
-use std::os::unix::prelude::OpenOptionsExt;
+use std::os::unix::prelude::{MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::{fs, io, thread};
 
@@ -49,12 +49,11 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
 
     let output: Box<dyn io::Write> = build_writer(restore.output.as_ref())?;
 
-    let backup_path_components: BackupPathComponents =
+    let spool_path_components: SpoolPathComponents =
         (cli.spool.clone(), restore.vault, restore.prefix.clone()).into();
 
-    let backup_dir: Option<PathBuf> = (&backup_path_components).into();
-    let Some(backup_dir) = backup_dir else {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid path {backup_path_components:?} given")));
+    let Some(restore_dir) = spool_path_components.to_queue_path(Queue::Restore) else {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid path {spool_path_components:?} given")));
     };
 
     let (notify_sender, notify_receiver) = crossbeam::channel::bounded(10);
@@ -62,15 +61,15 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
     let mut watcher =
         RecommendedWatcher::new(notify_sender, notify::Config::default()).map_err(notify_error)?;
 
-    log::trace!("Watching {backup_dir:?}");
+    log::trace!("Watching {restore_dir:?}");
     watcher
-        .watch(&backup_dir, RecursiveMode::Recursive)
+        .watch(&restore_dir, RecursiveMode::Recursive)
         .map_err(notify_error)?;
 
     let (event_sender, fragment_receiver) = crossbeam::channel::unbounded::<Option<Fragment>>();
 
     thread::spawn(move || {
-        notify_event_worker(&backup_dir, &mut watcher, &notify_receiver, &event_sender)
+        notify_event_worker(&restore_dir, &mut watcher, &notify_receiver, &event_sender)
     });
 
     let copy_result = fragment_worker(fragment_receiver, output)?;
@@ -178,9 +177,26 @@ fn notify_event_worker(
                     )?;
                 }
             }
-            notify::Event { .. } => {
-                //log::trace!("Ignoring event {kind:?} {paths:?} {attrs:?}");
+            notify::Event {
+                kind, paths, attrs, ..
+            } if kind == &EventKind::Create(CreateKind::File) => {
+                for path in paths {
+                    if let Ok(metadata) = fs::metadata(path) {
+                        let nlink = metadata.nlink();
+                        if nlink > 1 {
+                            log::trace!(
+                                "Found hard-linked file ({nlink:?}): {kind:?} {paths:?} {attrs:?}"
+                            );
+                        }
+                    }
+                    log::trace!("Ignoring create-file event {kind:?} {paths:?} {attrs:?}");
+                }
                 continue;
+            }
+            notify::Event {
+                kind, paths, attrs, ..
+            } => {
+                log::trace!("Ignoring event {kind:?} {paths:?} {attrs:?}");
             }
         }
         loop {

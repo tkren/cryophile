@@ -10,7 +10,7 @@
 use crate::cli::{constants::DEFAULT_BUF_SIZE, Backup, Cli};
 use crate::compression::CompressionType;
 use crate::core::constants::{CHUNK_FILE_MODE, CHUNK_FILE_PREFIX};
-use crate::core::path::{use_dir_atomic_create_maybe, BackupPathComponents, CreateDirectory};
+use crate::core::path::{use_dir_atomic_create_maybe, CreateDirectory, Queue, SpoolPathComponents};
 use crate::core::Split;
 use crate::crypto::openpgp::{build_encryptor, openpgp_error, parse_keyring, Keyring};
 
@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     log::info!("BACKUP…");
 
-    let backup_path_components: BackupPathComponents = (
+    let spool_path_components: SpoolPathComponents = (
         cli.spool.clone(),
         backup.vault,
         backup.prefix.clone(),
@@ -32,9 +32,12 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     )
         .into();
 
-    let backup_dir: Option<PathBuf> = (&backup_path_components).into();
-    let Some(backup_dir) = backup_dir else {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid path {backup_path_components:?} given")));
+    let Some(backup_dir) = spool_path_components.to_queue_path(Queue::Backup) else {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid path {spool_path_components:?} given")));
+    };
+
+    let Some(freeze_dir) = spool_path_components.to_queue_path(Queue::Freeze) else {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid path {spool_path_components:?} given")));
     };
 
     let mut recipients: Vec<Box<dyn age::Recipient>> = vec![];
@@ -69,9 +72,10 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     // permafrust backup calls win in case they started with the same timestamp
     // https://rcrowley.org/2010/01/06/things-unix-can-do-atomically.html
     use_dir_atomic_create_maybe(&backup_dir, CreateDirectory::Recursive)?;
+    use_dir_atomic_create_maybe(&freeze_dir, CreateDirectory::Recursive)?;
 
     // TODO signal handling, Ctrl+C does not finish stream https://rust-cli.github.io/book/in-depth/signals.html
-    let mut splitter = Split::new(&backup_dir, CHUNK_FILE_PREFIX, backup.size);
+    let mut splitter = Split::new(&backup_dir, &freeze_dir, CHUNK_FILE_PREFIX, backup.size);
 
     let mut encryptor_sink = build_encryptor(cert_list, &mut splitter)?;
 
@@ -125,18 +129,20 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     encryptor_sink.flush()?;
     encryptor_sink.finalize().map_err(openpgp_error)?;
     drop(splitter);
-    touch_zero_file(&backup_dir)
+    touch_zero_file(&backup_dir, &freeze_dir)
 }
 
-fn touch_zero_file(prefix: &Path) -> io::Result<()> {
-    let zero_file = prefix.join(CHUNK_FILE_PREFIX).with_extension("0");
+fn touch_zero_file(incoming: &Path, outgoing: &Path) -> io::Result<()> {
+    let zero_file = incoming.join(CHUNK_FILE_PREFIX).with_extension("0");
     log::trace!("Touch {zero_file:?}");
     fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(CHUNK_FILE_MODE)
-        .open(zero_file)?;
-    Ok(())
+        .open(&zero_file)?;
+    let zero_link = outgoing.join(CHUNK_FILE_PREFIX).with_extension("0");
+    log::trace!("Link {zero_file:?}");
+    fs::hard_link(zero_file, zero_link)
 }
 
 fn compressor_worker(reader: &mut dyn io::Read, compressor: &mut dyn io::Write) -> io::Result<u64> {

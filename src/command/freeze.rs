@@ -11,9 +11,10 @@ use crate::cli::{Cli, Freeze};
 use crate::config::ConfigFile;
 use crate::core::aws;
 use crate::core::notify::notify_error;
+use crate::core::path::Queue;
 use notify::event::{AccessKind, AccessMode, CreateKind, RemoveKind};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::{fs, io};
 use walkdir::WalkDir;
@@ -64,12 +65,14 @@ pub fn perform_freeze(
 
     log::trace!("Config: {config:#?}");
 
-    let spool = cli.spool.as_ref();
-    watch_read_dir(&mut watcher, spool, RecursiveMode::Recursive)?;
-    log::debug!("Watching spool {spool:?}");
+    let spool: &Path = cli.spool.as_ref();
+    let queue_path: PathBuf = Queue::Freeze.into();
+    let freeze_dir = spool.join(queue_path);
+    watch_read_dir(&mut watcher, &freeze_dir, RecursiveMode::Recursive)?;
+    log::debug!("Watching spool {freeze_dir:?}");
 
     for res in rx {
-        event_handler(res, spool, &mut watcher).map_err(notify_error)?;
+        event_handler(res, &freeze_dir, &mut watcher).map_err(notify_error)?;
     }
 
     Ok(())
