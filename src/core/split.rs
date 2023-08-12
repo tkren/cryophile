@@ -21,7 +21,8 @@ pub struct Split {
     pos: usize,             // written bytes of current split
     tot: u64,               // total bytes written
     val: u64,               // number of file splits
-    prefix: PathBuf,        // path prefix
+    incoming: PathBuf,      // incoming chunk prefix
+    outgoing: PathBuf,      // outgoing link prefix
     file: Option<fs::File>, // current output file
     mark_failed: bool,      // Split had an error
 }
@@ -30,29 +31,32 @@ impl Drop for Split {
     fn drop(&mut self) {
         log::trace!(
             "Split statistics: prefix={prefix:?} total_bytes={total_bytes} chunks={chunks} failed={failed}",
-            prefix=self.prefix,
+            prefix=self.incoming,
             total_bytes=self.tot,
             chunks=self.val,
             failed=self.mark_failed
         );
+        // flush data
         if let Err(err) = self.flush() {
-            let path_buf = self.current_path_buf();
-            log::error!(
-                "Cannot flush {path}: {err}",
-                path = path_buf.as_path().display()
-            );
+            log::error!("Cannot flush: {err}");
+            return;
+        }
+        // link current incoming chunk outgoing
+        if let Err(err) = self.outgoing_chunk() {
+            log::error!("Cannot link: {err}");
         }
     }
 }
 
 impl Split {
-    pub fn new(prefix_path: &Path, chunk_prefix: &str, num: usize) -> Self {
+    pub fn new(incoming: &Path, outgoing: &Path, chunk_prefix: &str, num: usize) -> Self {
         Split {
             num,
             pos: 0,
             tot: 0,
             val: 0,
-            prefix: prefix_path.join(chunk_prefix),
+            incoming: incoming.join(chunk_prefix),
+            outgoing: outgoing.join(chunk_prefix),
             file: None,
             mark_failed: false,
         }
@@ -72,8 +76,39 @@ impl Split {
         self.tot
     }
 
-    fn current_path_buf(&mut self) -> PathBuf {
-        self.prefix.with_extension(self.val.to_string())
+    fn current_incoming_path(&self) -> PathBuf {
+        self.incoming.with_extension(self.val.to_string())
+    }
+
+    fn current_outgoing_path(&self) -> PathBuf {
+        self.outgoing.with_extension(self.val.to_string())
+    }
+
+    fn mark_failed_err<T>(&mut self, err: &io::Error, error: &str) -> io::Result<T> {
+        self.mark_failed = true;
+        log::error!("{error}");
+        Err(io::Error::new(err.kind(), error))
+    }
+
+    fn outgoing_chunk(&mut self) -> io::Result<()> {
+        // link current incoming chunk outgoing
+        let Some(file) = self.file.as_ref() else {
+            return Ok(());
+        };
+        let incoming = self.current_incoming_path();
+        let outgoing = self.current_outgoing_path();
+        if let Err(err) = file.sync_data() {
+            return self.mark_failed_err(&err, &format!("Cannot sync incoming {incoming:?}"));
+        }
+        log::trace!("Creating new link {outgoing:?} => {incoming:?}");
+        if let Err(err) = fs::hard_link(&incoming, &outgoing) {
+            return self.mark_failed_err(&err, &format!("Cannot create new outgoing {outgoing:?}"));
+        }
+        log::trace!("Unlinking incoming {incoming:?}");
+        if let Err(err) = fs::remove_file(incoming) {
+            return self.mark_failed_err(&err, &format!("Cannot unlink incoming {outgoing:?}"));
+        }
+        Ok(())
     }
 
     fn use_file_or_next(&mut self) -> io::Result<usize> {
@@ -93,37 +128,31 @@ impl Split {
             ));
         }
 
+        // use file
         if self.file.is_some() && self.pos < self.num {
             return Ok(self.num - self.pos);
         }
 
+        // link current incoming chunk outgoing
+        self.outgoing_chunk()?;
+
+        // open next chunk
         self.val += 1;
-        let path_buf = self.current_path_buf();
-        let file_path = path_buf.as_path();
+        let incoming = self.current_incoming_path();
 
-        log::trace!("Creating new chunk {file_path:?}");
+        log::trace!("Creating new chunk {incoming:?}");
 
-        self.file = match fs::File::options()
+        let file = fs::File::options()
             .write(true)
             .create_new(true)
             .mode(CHUNK_FILE_MODE)
-            .open(file_path)
-        {
-            Ok(file) => Some(file),
-            Err(err) => {
-                self.mark_failed = true;
+            .open(&incoming);
 
-                log::error!(
-                    "Cannot create new file {path}, marking Split failed",
-                    path = file_path.display()
-                );
-
-                return Err(io::Error::new(
-                    err.kind(),
-                    format!("Cannot create new file {path}", path = file_path.display()),
-                ));
-            }
+        if let Err(err) = file {
+            return self.mark_failed_err(&err, &format!("Cannot create new incoming {incoming:?}"));
         };
+
+        self.file = file.ok();
         self.pos = 0;
 
         Ok(self.num)
@@ -146,7 +175,14 @@ impl Split {
 
         let _remaining_split = self.use_file_or_next()?;
 
-        let mut file = self.file.as_ref().unwrap();
+        let Some(mut file) = self.file.as_ref() else {
+            self.mark_failed = true;
+            log::error!(
+                "Split has unexpected closed file at position {total_bytes}, ignoring write request",
+                total_bytes = self.tot
+            );
+            return Ok(0);
+        };
 
         let mut slice = buf;
         let n = io::copy(&mut slice, &mut file)?;
@@ -188,7 +224,7 @@ impl io::Write for Split {
         log::trace!(
             "Head remaining={remaining:?} prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
             remaining=remainder,
-            prefix=self.prefix,
+            prefix=self.incoming,
             total_bytes=self.tot,
             chunks=self.val
         );
@@ -200,7 +236,7 @@ impl io::Write for Split {
             log::trace!(
                 "Tail remaining={remaining:?} prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
                 remaining = buf_len.saturating_sub(remainder),
-                prefix=self.prefix,
+                prefix=self.incoming,
                 total_bytes=self.tot,
                 chunks=self.val
             );
@@ -235,7 +271,7 @@ impl io::Write for Split {
         };
         log::trace!(
             "Attempting flush: prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
-            prefix = self.prefix,
+            prefix = self.incoming,
             total_bytes = self.tot,
             chunks = self.val
         );

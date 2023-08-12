@@ -8,6 +8,7 @@
 // to those terms.
 
 use permafrust;
+use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::IoSlice;
@@ -20,8 +21,10 @@ use tempfile;
 fn test_split_write() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
+    let out_path = tmp_path.join("out");
+    let _ = fs::create_dir(&out_path);
     println!("tmpdir {tmp_path:?}");
-    let mut splitter = permafrust::core::Split::new(&tmp_path, "chunk", 3);
+    let mut splitter = permafrust::core::Split::new(&tmp_path, &out_path, "chunk", 3);
 
     let mut s = String::from("0123456789abcdef");
 
@@ -36,13 +39,15 @@ fn test_split_write() {
 
     for i in 1..6 {
         let chunk = format!("chunk.{i}");
-        let path = tmp_dir.path().join(chunk);
-        let mut chunk_file = File::open(path.clone()).expect("failed to open chunk file");
+        let path = tmp_dir.path().join(&chunk);
+        let out_path = out_path.join(&chunk);
+        File::open(path.clone()).expect_err("chunk file is still present");
+        let mut out_file = File::open(out_path.clone()).expect("failed to open out file");
         let mut buf = String::new();
 
-        chunk_file
+        out_file
             .read_to_string(&mut buf)
-            .expect("failed to read chunk file");
+            .expect("failed to read out file");
 
         let remainder = if s.len() >= 3 {
             s.split_off(3)
@@ -52,7 +57,7 @@ fn test_split_write() {
         assert_eq!(buf, s);
         s = remainder;
 
-        std::fs::remove_file(path).expect("Could not remove old chunk");
+        std::fs::remove_file(path).expect_err("old chunk is still present");
     }
 
     s.clear();
@@ -73,8 +78,10 @@ fn test_split_write() {
 fn test_split_write_vectored() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
+    let out_path = tmp_path.join("out");
+    let _ = fs::create_dir(&out_path);
     println!("tmpdir {tmp_path:?}");
-    let mut splitter = permafrust::core::Split::new(&tmp_path, "chunk", 3);
+    let mut splitter = permafrust::core::Split::new(&tmp_path, &out_path, "chunk", 3);
 
     let s = String::from("0123456789abcdef");
 
@@ -94,9 +101,11 @@ fn test_split_write_vectored() {
 fn test_copy_to_split() {
     let tmp_dir = tempfile::TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
+    let out_path = tmp_path.join("out");
+    let _ = fs::create_dir(&out_path);
     println!("tmpdir {tmp_path:?}");
 
-    let mut splitter = permafrust::core::Split::new(&tmp_path, "chunk", 512);
+    let mut splitter = permafrust::core::Split::new(&tmp_path, &out_path, "chunk", 512);
 
     let s = String::from("0123456789abcdef");
     let strings = s.repeat(1000);
