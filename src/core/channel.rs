@@ -7,13 +7,12 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-pub mod aws;
-pub mod channel;
-pub mod constants;
-pub mod encoder;
-pub mod fragment;
-pub mod notify;
-pub mod path;
-pub mod split;
+use std::io;
 
-pub use split::Split;
+pub fn channel_send_error<T>(e: crossbeam::channel::SendError<T>) -> io::Error {
+    io::Error::new(io::ErrorKind::Other, format!("Channel send error: {e}"))
+}
+
+pub fn channel_recv_error(e: crossbeam::channel::RecvError) -> io::Error {
+    io::Error::new(io::ErrorKind::Other, format!("Channel recv error: {e}"))
+}

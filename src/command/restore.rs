@@ -8,6 +8,7 @@
 // to those terms.
 
 use crate::cli::{Cli, Restore};
+use crate::core::channel::{channel_recv_error, channel_send_error};
 use crate::core::fragment::Fragment;
 use crate::core::notify::notify_error;
 use crate::core::path::{Queue, SpoolPathComponents};
@@ -76,14 +77,6 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
     log::info!("Received total of {copy_result} bytes");
 
     Ok(())
-}
-
-fn channel_send_error<T>(e: crossbeam::channel::SendError<T>) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, format!("Channel send error: {e}"))
-}
-
-fn channel_recv_error(e: crossbeam::channel::RecvError) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, format!("Channel recv error: {e}"))
 }
 
 fn fragment_worker(
