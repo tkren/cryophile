@@ -44,7 +44,8 @@ pub(crate) fn parse_keyring(s: &str) -> Result<Vec<Cert>, String> {
         if let Err(err) = parsed_cert {
             return Err(openpgp_error(err).to_string());
         }
-        let result: Cert = parsed_cert.unwrap();
+        let result: Cert =
+            parsed_cert.expect("parsing errors for certificates should have been caught before");
         cert_list.push(result);
     }
     if cert_list.is_empty() {
