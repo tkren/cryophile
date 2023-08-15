@@ -8,7 +8,7 @@
 // to those terms.
 
 use super::constants::DEFAULT_CHUNK_SIZE;
-use super::parse::{parse_chunk_size, parse_keyring, parse_recipient, parse_uuid};
+use super::parse::{parse_chunk_size, parse_fd, parse_keyring, parse_recipient, parse_uuid};
 use crate::compression::CompressionType;
 use crate::crypto::age::RecipientSpec;
 use clap::{value_parser, Parser, Subcommand};
@@ -85,6 +85,9 @@ pub struct Thaw {}
 pub struct Restore {
     #[arg(short, long, help = "keyring", action = clap::ArgAction::Append, required = true, value_parser = parse_keyring)]
     pub keyring: Vec<Vec<Cert>>,
+
+    #[arg(short = 'P', long, help = "read password from file descriptor", value_parser = parse_fd)]
+    pub pass_fd: Option<i32>,
 
     #[arg(short, long, help = "output file", value_parser = value_parser!(PathBuf))]
     pub output: Option<PathBuf>,

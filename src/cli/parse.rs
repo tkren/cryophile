@@ -53,3 +53,11 @@ pub(crate) fn parse_keyring(s: &str) -> Result<Vec<Cert>, String> {
     }
     Ok(cert_list)
 }
+
+pub(crate) fn parse_fd(s: &str) -> Result<i32, String> {
+    let raw_fd = s.parse::<i32>().map_err(|e| e.to_string())?;
+    if raw_fd < 0 {
+        return Err("Parsed file descriptor is smaller than 0".to_string());
+    }
+    Ok(raw_fd)
+}
