@@ -12,9 +12,13 @@ use crate::core::channel::{channel_recv_error, channel_send_error};
 use crate::core::fragment::Fragment;
 use crate::core::notify::notify_error;
 use crate::core::path::{Queue, SpoolPathComponents};
+use crate::crypto::openpgp::{
+    build_decryptor, openpgp_error, read_password_fd, secret_key_store, SecretKeyStore,
+};
 use crossbeam::channel::{Receiver, Sender};
 use notify::event::{AccessKind, AccessMode, CreateKind};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use sequoia_openpgp::policy::StandardPolicy;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::os::unix::prelude::{MetadataExt, OpenOptionsExt};
@@ -62,6 +66,12 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
     let mut watcher =
         RecommendedWatcher::new(notify_sender, notify::Config::default()).map_err(notify_error)?;
 
+    let policy = &StandardPolicy::new();
+    let password = restore.pass_fd.and_then(read_password_fd);
+    let secret_key_store = secret_key_store(policy, restore.keyring.iter().flatten(), password)?;
+
+    //use_dir_atomic_create_maybe(&restore_dir, CreateDirectory::Recursive)?;
+
     log::trace!("Watching {restore_dir:?}");
     watcher
         .watch(&restore_dir, RecursiveMode::Recursive)
@@ -73,7 +83,7 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
         notify_event_worker(&restore_dir, &mut watcher, &notify_receiver, &event_sender)
     });
 
-    let copy_result = fragment_worker(fragment_receiver, output)?;
+    let copy_result = fragment_worker(fragment_receiver, secret_key_store, policy, output)?;
     log::info!("Received total of {copy_result} bytes");
 
     Ok(())
@@ -81,22 +91,29 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
 
 fn fragment_worker(
     receiver: crossbeam::channel::Receiver<Option<Fragment>>,
+    secret_key_store: SecretKeyStore,
+    policy: &StandardPolicy,
     output: Box<dyn io::Write>,
 ) -> io::Result<u64> {
     log::trace!("Starting fragment_worker…");
     let mut bytes_written: u64 = 0;
     let mut buffered_writer = io::BufWriter::new(output);
-    loop {
-        match receiver.recv().map_err(channel_recv_error)? {
-            None => break,
-            Some(item) => {
-                log::trace!("Received fragment {item}");
-                let fragment = fs::OpenOptions::new().read(true).open(item.path)?;
-                let mut reader = io::BufReader::new(fragment);
-                bytes_written += io::copy(&mut reader, &mut buffered_writer)?
-            }
+    //loop {
+    match receiver.recv().map_err(channel_recv_error)? {
+        None => {
+            /*break*/
+            return Ok(bytes_written);
+        }
+        Some(item) => {
+            log::trace!("Received fragment {item}");
+            let fragment = fs::OpenOptions::new().read(true).open(item.path)?;
+            let reader = io::BufReader::new(fragment);
+            let mut decryptor =
+                build_decryptor(secret_key_store, policy, reader).map_err(openpgp_error)?;
+            bytes_written += io::copy(&mut decryptor, &mut buffered_writer)?;
         }
     }
+    //}
     log::trace!("Finishing fragment_worker…");
     Ok(bytes_written)
 }
@@ -110,9 +127,7 @@ fn send_or_push_fragment(
     if fragment.priority == priority {
         log::trace!("Sending fragment {fragment}");
         let Reverse(prio) = fragment.priority;
-        sender
-            .send(Some(fragment))
-            .map_err(channel_send_error)?;
+        sender.send(Some(fragment)).map_err(channel_send_error)?;
         Ok(Reverse(prio + 1))
     } else {
         log::debug!(
@@ -182,7 +197,18 @@ fn notify_event_worker(
                             );
                         }
                     }
-                    log::trace!("Ignoring create-file event {kind:?} {paths:?} {attrs:?}");
+                    let Some(current_fragment) = Fragment::new(path.as_path()) else {continue;};
+                    if current_fragment.priority == Reverse(0) {
+                        log::trace!("Received zero fragment: {current_fragment:?}");
+                        zero_received = true;
+                        continue;
+                    }
+                    current_priority = send_or_push_fragment(
+                        sender,
+                        &mut heap,
+                        current_fragment,
+                        current_priority,
+                    )?;
                 }
                 continue;
             }
