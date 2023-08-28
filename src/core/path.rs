@@ -101,7 +101,9 @@ impl SpoolPathComponents {
         // next we add a vault as lower-case hyphenated UUID
         let vault_string = &self.vault.to_string();
         let backup_vault_path = Path::new(vault_string);
-        let Some(vault_dir) = build_canonical_path(backup_vault_path) else {return None;};
+        let Some(vault_dir) = build_canonical_path(backup_vault_path) else {
+            return None;
+        };
         log::trace!("Using vault directory {vault_dir:?}");
         backup_dir.push(vault_dir);
 
@@ -112,16 +114,22 @@ impl SpoolPathComponents {
             Path::new("")
         };
 
-        let Some(prefix_dir) = build_canonical_path(prefix_path) else {return None;};
+        let Some(prefix_dir) = build_canonical_path(prefix_path) else {
+            return None;
+        };
         log::trace!("Using prefix path {prefix_dir:?}");
         backup_dir.push(prefix_dir);
 
         // finally, the current UTC timestamp
-        let Some(ts) = &self.timestamp else {return Some(backup_dir);};
+        let Some(ts) = &self.timestamp else {
+            return Some(backup_dir);
+        };
         let utc_string = ts.unix_timestamp().to_string();
         let utc_timestamp = Path::new(&utc_string);
 
-        let Some(timestamp_dir) = build_canonical_path(utc_timestamp) else {return None;};
+        let Some(timestamp_dir) = build_canonical_path(utc_timestamp) else {
+            return None;
+        };
         log::trace!("Using timestamp directory {timestamp_dir:?}");
         backup_dir.push(timestamp_dir);
 

@@ -267,7 +267,7 @@ impl io::Write for Split {
     fn flush(&mut self) -> io::Result<()> {
         let Some(file) = &mut self.file else {
             log::trace!("Nothing to flush…");
-            return Ok(())
+            return Ok(());
         };
         log::trace!(
             "Attempting flush: prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
