@@ -58,7 +58,10 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
         (cli.spool.clone(), restore.vault, restore.prefix.clone()).into();
 
     let Some(restore_dir) = spool_path_components.to_queue_path(Queue::Restore) else {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid path {spool_path_components:?} given")));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Invalid path {spool_path_components:?} given"),
+        ));
     };
 
     let (notify_sender, notify_receiver) = crossbeam::channel::bounded(10);
@@ -171,7 +174,9 @@ fn notify_event_worker(
             {
                 log::debug!("Received restore fragment: {kind:?} {paths:?} {attrs:?}");
                 for path in paths {
-                    let Some(current_fragment) = Fragment::new(path.as_path()) else {continue;};
+                    let Some(current_fragment) = Fragment::new(path.as_path()) else {
+                        continue;
+                    };
                     if current_fragment.priority == Reverse(0) {
                         log::trace!("Received zero fragment: {current_fragment:?}");
                         zero_received = true;
@@ -197,7 +202,9 @@ fn notify_event_worker(
                             );
                         }
                     }
-                    let Some(current_fragment) = Fragment::new(path.as_path()) else {continue;};
+                    let Some(current_fragment) = Fragment::new(path.as_path()) else {
+                        continue;
+                    };
                     if current_fragment.priority == Reverse(0) {
                         log::trace!("Received zero fragment: {current_fragment:?}");
                         zero_received = true;
