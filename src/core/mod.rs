@@ -8,6 +8,7 @@
 // to those terms.
 
 pub mod aws;
+pub mod cat;
 pub mod channel;
 pub mod constants;
 pub mod encoder;
