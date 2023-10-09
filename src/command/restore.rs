@@ -8,7 +8,8 @@
 // to those terms.
 
 use crate::cli::{Cli, Restore};
-use crate::core::channel::{channel_recv_error, channel_send_error};
+use crate::core::cat::Cat;
+use crate::core::channel::channel_send_error;
 use crate::core::fragment::Fragment;
 use crate::core::notify::notify_error;
 use crate::core::path::{Queue, SpoolPathComponents};
@@ -80,49 +81,36 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
         .watch(&restore_dir, RecursiveMode::Recursive)
         .map_err(notify_error)?;
 
-    let (event_sender, fragment_receiver) = crossbeam::channel::unbounded::<Option<Fragment>>();
+    let concat = Cat::new();
+    let sender = concat.tx();
 
-    thread::spawn(move || {
-        notify_event_worker(&restore_dir, &mut watcher, &notify_receiver, &event_sender)
+    let handle = thread::spawn(move || {
+        notify_event_worker(&restore_dir, &mut watcher, &notify_receiver, &sender)
     });
 
-    let copy_result = fragment_worker(fragment_receiver, secret_key_store, policy, output)?;
+    let copy_result = fragment_worker(concat, secret_key_store, policy, output)?;
     log::info!("Received total of {copy_result} bytes");
 
-    Ok(())
+    handle.join().expect("could not join thread")
 }
 
 fn fragment_worker(
-    receiver: crossbeam::channel::Receiver<Option<Fragment>>,
+    concat: Cat,
     secret_key_store: SecretKeyStore,
     policy: &StandardPolicy,
     output: Box<dyn io::Write>,
 ) -> io::Result<u64> {
     log::trace!("Starting fragment_worker…");
-    let mut bytes_written: u64 = 0;
     let mut buffered_writer = io::BufWriter::new(output);
-    //loop {
-    match receiver.recv().map_err(channel_recv_error)? {
-        None => {
-            /*break*/
-            return Ok(bytes_written);
-        }
-        Some(item) => {
-            log::trace!("Received fragment {item}");
-            let fragment = fs::OpenOptions::new().read(true).open(item.path)?;
-            let reader = io::BufReader::new(fragment);
-            let mut decryptor =
-                build_decryptor(secret_key_store, policy, reader).map_err(openpgp_error)?;
-            bytes_written += io::copy(&mut decryptor, &mut buffered_writer)?;
-        }
-    }
-    //}
+    let reader = io::BufReader::new(concat);
+    let mut decryptor = build_decryptor(secret_key_store, policy, reader).map_err(openpgp_error)?;
+    let bytes_written = io::copy(&mut decryptor, &mut buffered_writer)?;
     log::trace!("Finishing fragment_worker…");
     Ok(bytes_written)
 }
 
 fn send_or_push_fragment(
-    sender: &Sender<Option<Fragment>>,
+    sender: &Sender<Option<PathBuf>>,
     heap: &mut BinaryHeap<Fragment>,
     fragment: Fragment,
     priority: Reverse<i32>,
@@ -130,7 +118,9 @@ fn send_or_push_fragment(
     if fragment.priority == priority {
         log::trace!("Sending fragment {fragment}");
         let Reverse(prio) = fragment.priority;
-        sender.send(Some(fragment)).map_err(channel_send_error)?;
+        sender
+            .send(Some(fragment.path))
+            .map_err(channel_send_error)?;
         Ok(Reverse(prio + 1))
     } else {
         log::debug!(
@@ -145,7 +135,7 @@ fn notify_event_worker(
     backup_dir: &Path,
     watcher: &mut RecommendedWatcher,
     notify_receiver: &Receiver<Result<notify::Event, notify::Error>>,
-    sender: &Sender<Option<Fragment>>,
+    sender: &Sender<Option<PathBuf>>,
 ) -> io::Result<()> {
     log::trace!("Starting notify_event_worker…");
 
