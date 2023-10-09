@@ -10,11 +10,19 @@
 use std::fs;
 use std::io;
 use std::io::Write;
+use std::os::fd::AsFd;
+use std::os::fd::AsRawFd;
 use std::os::unix::prelude::OpenOptionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 
+use nix::fcntl::FallocateFlags;
+
 use crate::core::constants::CHUNK_FILE_MODE;
+
+fn errno_error(e: nix::errno::Errno) -> io::Error {
+    io::Error::from_raw_os_error(e as i32)
+}
 
 pub struct Split {
     num: usize,             // maximum size of each split
@@ -41,9 +49,9 @@ impl Drop for Split {
             log::error!("Cannot flush: {err}");
             return;
         }
-        // link current incoming chunk outgoing
+        // truncate and link current incoming chunk outgoing
         if let Err(err) = self.outgoing_chunk() {
-            log::error!("Cannot link: {err}");
+            log::error!("Cannot truncate and link: {err}");
         }
     }
 }
@@ -100,6 +108,17 @@ impl Split {
         if let Err(err) = file.sync_data() {
             return self.mark_failed_err(&err, &format!("Cannot sync incoming {incoming:?}"));
         }
+
+        // truncate fallocate'd file to actual bytes written
+        if self.pos < self.num {
+            log::trace!("Truncate {incoming:?} to {len} bytes", len = self.pos);
+            let len = i64::try_from(self.pos).expect("chunk position exceeds usize");
+            if let Err(err) = nix::unistd::ftruncate(file.as_fd(), len).map_err(errno_error) {
+                return self
+                    .mark_failed_err(&err, &format!("Cannot ftruncate incoming {incoming:?}"));
+            }
+        }
+
         log::trace!("Creating new link {outgoing:?} => {incoming:?}");
         if let Err(err) = fs::hard_link(&incoming, &outgoing) {
             return self.mark_failed_err(&err, &format!("Cannot create new outgoing {outgoing:?}"));
@@ -155,6 +174,25 @@ impl Split {
         self.file = file.ok();
         self.pos = 0;
 
+        let len = i64::try_from(self.num).expect("chunk size exceeds usize");
+        if let Err(err) = nix::fcntl::fallocate(
+            self.file.as_ref().unwrap().as_raw_fd(),
+            FallocateFlags::empty(),
+            0,
+            len,
+        )
+        .map_err(errno_error)
+        {
+            log::warn!("Need more disk space to fallocate {len} bytes for new fragment {incoming:?} ({err}), retrying.");
+            self.file = None;
+            if let Err(err) = fs::remove_file(&incoming) {
+                return self
+                    .mark_failed_err(&err, &format!("Cannot unlink new fragment {incoming:?}"));
+            }
+            // retry
+            return Ok(0);
+        };
+
         Ok(self.num)
     }
 
@@ -173,12 +211,15 @@ impl Split {
             return Ok(0);
         }
 
-        let _remaining_split = self.use_file_or_next()?;
+        let remaining_bytes = self.use_file_or_next()?;
+        if remaining_bytes == 0 {
+            return Ok(0);
+        }
 
         let Some(mut file) = self.file.as_ref() else {
             self.mark_failed = true;
             log::error!(
-                "Split has unexpected closed file at position {total_bytes}, ignoring write request",
+                "Split has unexpectedly closed file at position {total_bytes}, ignoring write request",
                 total_bytes = self.tot
             );
             return Ok(0);
