@@ -28,7 +28,7 @@ use openpgp::{
         Parse,
     },
     policy::Policy,
-    serialize::stream::{Encryptor, LiteralWriter, Message, Recipient},
+    serialize::stream::{Encryptor2, LiteralWriter, Message, Recipient},
     types::{DataFormat, SymmetricAlgorithm},
     Cert, Fingerprint, KeyID,
 };
@@ -203,7 +203,7 @@ where
     );
     let message = Message::new(output);
     let encryptor =
-        Encryptor::for_recipients(message, recipients).symmetric_algo(SymmetricAlgorithm::AES256);
+        Encryptor2::for_recipients(message, recipients).symmetric_algo(SymmetricAlgorithm::AES256);
 
     // Encrypt the message.
     log::trace!("Starting encryption…");
