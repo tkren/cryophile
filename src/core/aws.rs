@@ -7,7 +7,7 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-use aws_config::meta::region::RegionProviderChain;
+use aws_config::{meta::region::RegionProviderChain, BehaviorVersion};
 use aws_sdk_s3::{config::Region, Client};
 use aws_types::SdkConfig;
 use log::log_enabled;
@@ -22,7 +22,10 @@ pub async fn aws_config(region: Option<String>) -> SdkConfig {
         log::trace!("Using S3 region {region}")
     }
 
-    aws_config::from_env().region(region_provider).load().await
+    aws_config::defaults(BehaviorVersion::latest())
+        .region(region_provider)
+        .load()
+        .await
 }
 
 pub async fn aws_client(config: &SdkConfig) -> Client {
