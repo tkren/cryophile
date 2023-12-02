@@ -13,6 +13,8 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+use chrono::{DateTime, Utc};
+use ulid::Ulid;
 use uuid::Uuid;
 
 fn build_canonical_path(dir: &Path) -> Option<PathBuf> {
@@ -41,34 +43,30 @@ pub struct SpoolPathComponents {
     pub spool: PathBuf,
     pub vault: Uuid,
     pub prefix: Option<PathBuf>,
-    pub timestamp: Option<time::OffsetDateTime>,
+    pub id: Option<Ulid>,
 }
 
-impl From<(PathBuf, Uuid, Option<PathBuf>)> for SpoolPathComponents {
-    fn from((spool, vault, prefix): (PathBuf, Uuid, Option<PathBuf>)) -> Self {
+impl SpoolPathComponents {
+    pub fn new(spool: PathBuf, vault: Uuid, prefix: Option<PathBuf>, id: Ulid) -> Self {
         Self {
             spool,
             vault,
             prefix,
-            ..Self::default()
+            id: Some(id),
         }
     }
-}
 
-impl From<(PathBuf, Uuid, Option<PathBuf>, time::OffsetDateTime)> for SpoolPathComponents {
-    fn from(
-        (spool, vault, prefix, timestamp): (PathBuf, Uuid, Option<PathBuf>, time::OffsetDateTime),
-    ) -> Self {
+    pub fn from_prefix(spool: PathBuf, vault: Uuid, prefix: PathBuf) -> Self {
         Self {
             spool,
             vault,
-            prefix,
-            timestamp: Some(timestamp),
+            prefix: Some(prefix),
+            id: None,
         }
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 pub enum Queue {
     #[default]
     Backup,
@@ -98,6 +96,8 @@ impl SpoolPathComponents {
         // next up: queue path
         backup_dir.push::<PathBuf>(queue.into());
 
+        log::trace!("Base directory for {queue:?} queue: {backup_dir:?}");
+
         // next we add a vault as lower-case hyphenated UUID
         let vault_string = &self.vault.to_string();
         let backup_vault_path = Path::new(vault_string);
@@ -120,18 +120,22 @@ impl SpoolPathComponents {
         log::trace!("Using prefix path {prefix_dir:?}");
         backup_dir.push(prefix_dir);
 
-        // finally, the current UTC timestamp
-        let Some(ts) = &self.timestamp else {
+        // finally, the current ULID path (timestamp + random)
+        let Some(id) = &self.id else {
             return Some(backup_dir);
         };
-        let utc_string = ts.unix_timestamp().to_string();
-        let utc_timestamp = Path::new(&utc_string);
+        let ulid_string = id.to_string();
+        let ulid_path = Path::new(&ulid_string);
 
-        let Some(timestamp_dir) = build_canonical_path(utc_timestamp) else {
+        let Some(ulid_dir) = build_canonical_path(ulid_path) else {
             return None;
         };
-        log::trace!("Using timestamp directory {timestamp_dir:?}");
-        backup_dir.push(timestamp_dir);
+        log::trace!(
+            "Using ULID directory {ulid_dir:?}: timestamp={ulid_timestamp:?} random={ulid_random:x?}",
+            ulid_timestamp=DateTime::<Utc>::from(id.datetime()),
+            ulid_random=id.random(),
+        );
+        backup_dir.push(ulid_dir);
 
         Some(backup_dir)
     }
