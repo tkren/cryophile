@@ -24,13 +24,12 @@ use std::path::{Path, PathBuf};
 pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     log::info!("BACKUP…");
 
-    let spool_path_components: SpoolPathComponents = (
+    let spool_path_components = SpoolPathComponents::new(
         cli.spool.clone(),
         backup.vault,
         backup.prefix.clone(),
-        time::OffsetDateTime::now_utc(),
-    )
-        .into();
+        backup.ulid.or(backup.timestamp).unwrap(),
+    );
 
     let Some(backup_dir) = spool_path_components.to_queue_path(Queue::Backup) else {
         return Err(io::Error::new(
