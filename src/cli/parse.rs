@@ -7,7 +7,9 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
+#[cfg(feature = "age")]
 use crate::crypto::age::RecipientSpec;
+
 use crate::crypto::openpgp::openpgp_error;
 use sequoia_openpgp::cert::CertParser;
 use sequoia_openpgp::parse::Parse;
@@ -30,6 +32,7 @@ pub(crate) fn parse_uuid(s: &str) -> Result<uuid::Uuid, String> {
     Ok(uuid)
 }
 
+#[cfg(feature = "age")]
 pub(crate) fn parse_recipient(s: &str) -> Result<RecipientSpec, String> {
     let recipient = s
         .parse::<RecipientSpec>()

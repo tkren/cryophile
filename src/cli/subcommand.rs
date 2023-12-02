@@ -8,9 +8,14 @@
 // to those terms.
 
 use super::constants::DEFAULT_CHUNK_SIZE;
-use super::parse::{parse_chunk_size, parse_fd, parse_keyring, parse_recipient, parse_uuid};
-use crate::compression::CompressionType;
+use super::parse::{parse_chunk_size, parse_fd, parse_keyring, parse_uuid};
+
+#[cfg(feature = "age")]
+use super::parse::parse_recipient;
+#[cfg(feature = "age")]
 use crate::crypto::age::RecipientSpec;
+
+use crate::compression::CompressionType;
 use clap::{value_parser, Parser, Subcommand};
 use sequoia_openpgp::Cert;
 use std::fmt;
@@ -44,6 +49,29 @@ impl fmt::Display for Command {
     }
 }
 
+#[derive(Parser, Debug)]
+#[command(about = "Not shown")]
+pub struct Backup {
+    #[arg(short = 'C', long, help = "compression type", value_enum, default_value_t = CompressionType::default())]
+    pub compression: CompressionType,
+
+    #[arg(short, long, help = "input file", value_parser = value_parser!(PathBuf))]
+    pub input: Option<PathBuf>,
+
+    #[arg(short, long, help = "keyring", action = clap::ArgAction::Append, required = true, value_parser = parse_keyring)]
+    pub keyring: Vec<Vec<Cert>>,
+
+    #[arg(short, long, help = "prefix path in vault", value_parser = value_parser!(PathBuf))]
+    pub prefix: Option<PathBuf>,
+
+    #[arg(short, long, help = "chunk size", value_parser = parse_chunk_size, default_value_t = DEFAULT_CHUNK_SIZE)]
+    pub size: usize,
+
+    #[arg(short, long, help = "vault", value_parser = parse_uuid)]
+    pub vault: uuid::Uuid,
+}
+
+#[cfg(feature = "age")]
 #[derive(Parser, Debug)]
 #[command(about = "Not shown")]
 pub struct Backup {
