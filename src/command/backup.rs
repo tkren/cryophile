@@ -46,26 +46,27 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
         ));
     };
 
-    let mut recipients: Vec<Box<dyn age::Recipient>> = vec![];
-    if backup.recipient.is_some() {
-        for recipient in backup.recipient.as_ref().unwrap() {
-            recipients.push(recipient.get_recipient());
+    #[cfg(feature = "age")]
+    {
+        let mut recipients: Vec<Box<dyn age::Recipient>> = vec![];
+        if backup.recipient.is_some() {
+            for recipient in backup.recipient.as_ref().unwrap() {
+                recipients.push(recipient.get_recipient());
+            }
         }
+        log::debug!(
+            "Age Recipients: {recipients:?}",
+            recipients = backup.recipient
+        );
     }
 
-    /*
-    log::debug!(
-        "Age Recipients: {recipients:?}",
-        recipients = backup.recipient
-    );
-    log::debug!("OpenPGP Keyring: {keyring:?}", keyring = backup.keyring);
-    */
     if backup.keyring.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "Keyring is empty",
         ));
     }
+    log::debug!("OpenPGP keyring has {num:?} certificate(s)", num = backup.keyring.len());
 
     // get certificates from keyring
     let policy = StandardPolicy::new();
