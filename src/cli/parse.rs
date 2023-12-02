@@ -11,9 +11,11 @@
 use crate::crypto::age::RecipientSpec;
 
 use crate::crypto::openpgp::openpgp_error;
+use chrono::{DateTime, FixedOffset};
 use sequoia_openpgp::cert::CertParser;
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
+use ulid::Ulid;
 
 pub(crate) fn parse_chunk_size(s: &str) -> Result<usize, String> {
     let parse_config = parse_size::Config::new()
@@ -63,4 +65,16 @@ pub(crate) fn parse_fd(s: &str) -> Result<i32, String> {
         return Err("Parsed file descriptor is smaller than 0".to_string());
     }
     Ok(raw_fd)
+}
+
+pub(crate) fn parse_timestamp_for_ulid(s: &str) -> Result<Ulid, String> {
+    let timestamp = s
+        .parse::<DateTime<FixedOffset>>()
+        .map_err(|e| e.to_string())?;
+    Ok(Ulid::from_datetime(timestamp.into()))
+}
+
+pub(crate) fn parse_ulid(s: &str) -> Result<Ulid, String> {
+    let ulid = Ulid::from_string(s).map_err(|e| format!("Cannot parse ulid: {e}"))?;
+    Ok(ulid)
 }

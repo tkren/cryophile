@@ -8,7 +8,9 @@
 // to those terms.
 
 use super::constants::DEFAULT_CHUNK_SIZE;
-use super::parse::{parse_chunk_size, parse_fd, parse_keyring, parse_uuid};
+use super::parse::{
+    parse_chunk_size, parse_fd, parse_keyring, parse_timestamp_for_ulid, parse_ulid, parse_uuid,
+};
 
 #[cfg(feature = "age")]
 use super::parse::parse_recipient;
@@ -20,6 +22,7 @@ use clap::{value_parser, Parser, Subcommand};
 use sequoia_openpgp::Cert;
 use std::fmt;
 use std::path::PathBuf;
+use ulid::Ulid;
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
@@ -64,6 +67,12 @@ pub struct Backup {
     #[arg(short, long, help = "prefix path in vault", value_parser = value_parser!(PathBuf))]
     pub prefix: Option<PathBuf>,
 
+    #[arg(group = "backup-ulid", short, long, help = "backup timestamp", value_parser = parse_timestamp_for_ulid)]
+    pub timestamp: Option<Ulid>,
+
+    #[arg(group = "backup-ulid", short, long, help = "backup ulid", value_parser = parse_ulid)]
+    pub ulid: Option<Ulid>,
+
     #[arg(short, long, help = "chunk size", value_parser = parse_chunk_size, default_value_t = DEFAULT_CHUNK_SIZE)]
     pub size: usize,
 
@@ -87,13 +96,19 @@ pub struct Backup {
     #[arg(short, long, help = "prefix path in vault", value_parser = value_parser!(PathBuf))]
     pub prefix: Option<PathBuf>,
 
+    #[arg(group = "backup-ulid", short, long, help = "backup timestamp", value_parser = parse_timestamp_for_ulid)]
+    pub timestamp: Option<Ulid>,
+
+    #[arg(group = "backup-ulid", short, long, help = "backup ulid", value_parser = parse_ulid)]
+    pub ulid: Option<Ulid>,
+
     #[arg(short, long, help = "recipient", value_parser = parse_recipient)]
     pub recipient: Option<Vec<RecipientSpec>>,
 
     #[arg(short, long, help = "chunk size", value_parser = parse_chunk_size, default_value_t = DEFAULT_CHUNK_SIZE)]
     pub size: usize,
 
-    #[arg(short, long, help = "vault", value_parser = parse_uuid)]
+    #[arg(short, long, help = "vault", value_parser = parse_uuid, requires = "backup-ulid")]
     pub vault: uuid::Uuid,
 }
 
