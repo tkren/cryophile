@@ -55,8 +55,11 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
 
     let output: Box<dyn io::Write> = build_writer(restore.output.as_ref())?;
 
-    let spool_path_components: SpoolPathComponents =
-        (cli.spool.clone(), restore.vault, restore.prefix.clone()).into();
+    let spool_path_components = SpoolPathComponents::from_prefix(
+        cli.spool.clone(),
+        restore.vault,
+        restore.prefix.clone().unwrap(),
+    );
 
     let Some(restore_dir) = spool_path_components.to_queue_path(Queue::Restore) else {
         return Err(io::Error::new(
