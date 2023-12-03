@@ -7,6 +7,9 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
+use std::path::PathBuf;
+use std::str::FromStr;
+
 #[cfg(feature = "age")]
 use crate::crypto::age::RecipientSpec;
 
@@ -77,4 +80,18 @@ pub(crate) fn parse_timestamp_for_ulid(s: &str) -> Result<Ulid, String> {
 pub(crate) fn parse_ulid(s: &str) -> Result<Ulid, String> {
     let ulid = Ulid::from_string(s).map_err(|e| format!("Cannot parse ulid: {e}"))?;
     Ok(ulid)
+}
+
+pub(crate) fn parse_prefix(s: &str) -> Result<PathBuf, String> {
+    if s.is_empty() {
+        return Err(String::from_str("prefix cannot be empty").map_err(|e| e.to_string())?);
+    }
+    let path = PathBuf::from_str(s).map_err(|e| e.to_string())?;
+    if path.has_root() {
+        return Err(
+            String::from_str("prefix cannot have a root component or be absolute")
+                .map_err(|e| e.to_string())?,
+        );
+    }
+    Ok(path)
 }

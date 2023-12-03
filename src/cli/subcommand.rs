@@ -9,7 +9,8 @@
 
 use super::constants::DEFAULT_CHUNK_SIZE;
 use super::parse::{
-    parse_chunk_size, parse_fd, parse_keyring, parse_timestamp_for_ulid, parse_ulid, parse_uuid,
+    parse_chunk_size, parse_fd, parse_keyring, parse_prefix, parse_timestamp_for_ulid, parse_ulid,
+    parse_uuid,
 };
 
 #[cfg(feature = "age")]
@@ -64,7 +65,7 @@ pub struct Backup {
     #[arg(short, long, help = "keyring", action = clap::ArgAction::Append, required = true, value_parser = parse_keyring)]
     pub keyring: Vec<Vec<Cert>>,
 
-    #[arg(short, long, help = "prefix path in vault", value_parser = value_parser!(PathBuf))]
+    #[arg(short, long, help = "prefix path in vault", value_parser = parse_prefix)]
     pub prefix: Option<PathBuf>,
 
     #[arg(group = "backup-ulid", short, long, help = "backup timestamp", value_parser = parse_timestamp_for_ulid)]
@@ -93,7 +94,7 @@ pub struct Backup {
     #[arg(short, long, help = "keyring", action = clap::ArgAction::Append, required = true, value_parser = parse_keyring)]
     pub keyring: Vec<Vec<Cert>>,
 
-    #[arg(short, long, help = "prefix path in vault", value_parser = value_parser!(PathBuf))]
+    #[arg(short, long, help = "prefix path in vault", value_parser = parse_prefix)]
     pub prefix: Option<PathBuf>,
 
     #[arg(group = "backup-ulid", short, long, help = "backup timestamp", value_parser = parse_timestamp_for_ulid)]
