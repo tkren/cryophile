@@ -53,7 +53,10 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
             "Keyring is empty",
         ));
     }
-    log::debug!("OpenPGP keyring has {num:?} certificate(s)", num = backup.keyring.len());
+    log::debug!(
+        "OpenPGP keyring has {num:?} certificate(s)",
+        num = backup.keyring.len()
+    );
 
     // get certificates from keyring
     let policy = StandardPolicy::new();
