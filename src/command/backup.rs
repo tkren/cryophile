@@ -30,20 +30,8 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
         backup.prefix.clone(),
         backup.ulid.or(backup.timestamp).unwrap(),
     );
-
-    let Some(backup_dir) = spool_path_components.to_queue_path(Queue::Backup) else {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Invalid path {spool_path_components:?} given"),
-        ));
-    };
-
-    let Some(freeze_dir) = spool_path_components.to_queue_path(Queue::Freeze) else {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Invalid path {spool_path_components:?} given"),
-        ));
-    };
+    let backup_dir = spool_path_components.to_queue_path(Queue::Backup)?;
+    let freeze_dir = spool_path_components.to_queue_path(Queue::Freeze)?;
 
     #[cfg(feature = "age")]
     {

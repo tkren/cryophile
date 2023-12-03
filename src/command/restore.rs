@@ -60,13 +60,7 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
         restore.vault,
         restore.prefix.clone().unwrap(),
     );
-
-    let Some(restore_dir) = spool_path_components.to_queue_path(Queue::Restore) else {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Invalid path {spool_path_components:?} given"),
-        ));
-    };
+    let restore_dir = spool_path_components.to_queue_path(Queue::Restore)?;
 
     let (notify_sender, notify_receiver) = crossbeam::channel::bounded(10);
 
