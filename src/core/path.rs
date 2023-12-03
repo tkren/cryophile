@@ -14,29 +14,9 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use nix::NixPath;
 use ulid::Ulid;
 use uuid::Uuid;
-
-fn build_canonical_path(dir: &Path) -> Option<PathBuf> {
-    let mut canonical_dir_path = PathBuf::new();
-
-    // create canonical representation
-    for component in dir.components() {
-        match component {
-            Component::Normal(subpath) => {
-                canonical_dir_path.push(subpath);
-            }
-            Component::CurDir => {
-                // ignore
-            }
-            _ => {
-                return None;
-            }
-        }
-    }
-
-    Some(canonical_dir_path)
-}
 
 #[derive(Clone, Debug, Default)]
 pub struct SpoolPathComponents {
@@ -86,8 +66,75 @@ impl From<Queue> for PathBuf {
     }
 }
 
+fn invalid_path_error(msg: String) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidInput, msg)
+}
+
+#[derive(Clone, Debug)]
+pub enum SpoolNameComponent {
+    Vault(Uuid),
+    Prefix(PathBuf),
+    Id(Ulid),
+}
+
+fn build_canonical_path_inner(dir: &PathBuf) -> io::Result<PathBuf> {
+    // here we only care about relative paths, needs validate_prefix first
+    let mut canonical_dir_path = PathBuf::new();
+
+    // create canonical representation
+    for component in dir.components() {
+        match component {
+            Component::Normal(subpath) => {
+                canonical_dir_path.push(subpath);
+            }
+            Component::CurDir => {
+                // ignore paths that start with ./ (other CurDir are already normalized)
+            }
+            _ => {
+                // ParentDir and RootDir and Prefix are disallowed
+                return Err(invalid_path_error(format!(
+                    "Path {dir:?} must not contain a .. component"
+                )));
+            }
+        }
+    }
+    Ok(canonical_dir_path)
+}
+
+fn build_canonical_path(comp: SpoolNameComponent) -> io::Result<PathBuf> {
+    let dir = match comp {
+        SpoolNameComponent::Vault(vault) => PathBuf::from(vault.to_string()),
+        SpoolNameComponent::Prefix(ref prefix) => build_canonical_path_inner(prefix)?,
+        SpoolNameComponent::Id(ulid) => PathBuf::from(ulid.to_string()),
+    };
+    log::trace!("Using {comp:?} directory {dir:?}");
+    Ok(dir)
+}
+
+fn validate_prefix(prefix: Option<&PathBuf>) -> io::Result<PathBuf> {
+    let prefix = if let Some(pfx) = prefix {
+        if pfx.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "prefix cannot be empty".to_string(),
+            ));
+        }
+        if pfx.has_root() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "prefix cannot have a root component or be absolute".to_string(),
+            ));
+        }
+        pfx.to_owned()
+    } else {
+        // only undefined prefixes can be empty
+        PathBuf::new()
+    };
+    Ok(prefix)
+}
+
 impl SpoolPathComponents {
-    pub fn to_queue_path(&self, queue: Queue) -> Option<PathBuf> {
+    pub fn to_queue_path(&self, queue: Queue) -> io::Result<PathBuf> {
         let mut backup_dir = PathBuf::new();
 
         // backup_dir starts with the spool directory
@@ -99,45 +146,27 @@ impl SpoolPathComponents {
         log::trace!("Base directory for {queue:?} queue: {backup_dir:?}");
 
         // next we add a vault as lower-case hyphenated UUID
-        let vault_string = &self.vault.to_string();
-        let backup_vault_path = Path::new(vault_string);
-        let Some(vault_dir) = build_canonical_path(backup_vault_path) else {
-            return None;
-        };
-        log::trace!("Using vault directory {vault_dir:?}");
+        let vault_dir = build_canonical_path(SpoolNameComponent::Vault(self.vault))?;
         backup_dir.push(vault_dir);
 
         // then the prefix key, potentially containing a path of length >= 1
-        let prefix_path = if let Some(prefix) = &self.prefix {
-            prefix.as_path()
-        } else {
-            Path::new("")
-        };
-
-        let Some(prefix_dir) = build_canonical_path(prefix_path) else {
-            return None;
-        };
-        log::trace!("Using prefix path {prefix_dir:?}");
+        let prefix_path = validate_prefix(self.prefix.as_ref())?;
+        let prefix_dir = build_canonical_path(SpoolNameComponent::Prefix(prefix_path))?;
         backup_dir.push(prefix_dir);
 
-        // finally, the current ULID path (timestamp + random)
-        let Some(id) = &self.id else {
-            return Some(backup_dir);
-        };
-        let ulid_string = id.to_string();
-        let ulid_path = Path::new(&ulid_string);
-
-        let Some(ulid_dir) = build_canonical_path(ulid_path) else {
-            return None;
+        // finally, the current ULID path (timestamp + random) if available
+        let Some(id) = self.id else {
+            return Ok(backup_dir);
         };
         log::trace!(
-            "Using ULID directory {ulid_dir:?}: timestamp={ulid_timestamp:?} random={ulid_random:x?}",
-            ulid_timestamp=DateTime::<Utc>::from(id.datetime()),
-            ulid_random=id.random(),
+            "Using ULID with timestamp={ulid_timestamp:?} and random={ulid_random:x?}",
+            ulid_timestamp = DateTime::<Utc>::from(id.datetime()),
+            ulid_random = id.random(),
         );
+        let ulid_dir = build_canonical_path(SpoolNameComponent::Id(id))?;
         backup_dir.push(ulid_dir);
 
-        Some(backup_dir)
+        Ok(backup_dir)
     }
 }
 
