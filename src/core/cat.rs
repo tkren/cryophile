@@ -7,7 +7,7 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-use std::{fs, io, path::PathBuf};
+use std::{fmt, fs, io, path::PathBuf};
 
 use crossbeam::channel::{Receiver, Sender};
 
@@ -21,6 +21,19 @@ pub struct Cat {
     num: u64,               // number of files concatenated
     file: Option<fs::File>, // current input file
     mark_failed: bool,      // Cat had an error
+}
+
+impl fmt::Debug for Cat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Cat {{ total_bytes: {total_bytes}, chunks: {chunks}, mark_failed: {mark_failed}, file: {file:?}}}",
+            total_bytes = self.tot,
+            chunks = self.num,
+            mark_failed = self.mark_failed,
+            file = self.file
+        )
+    }
 }
 
 impl Cat {
