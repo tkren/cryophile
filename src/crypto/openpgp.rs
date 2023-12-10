@@ -40,7 +40,7 @@ pub fn openpgp_error(e: anyhow::Error) -> io::Error {
         Ok(e) => return e,
         Err(e) => e,
     };
-    io::Error::new(io::ErrorKind::Other, e)
+    io::Error::other(e)
 }
 
 pub fn storage_encryption_certs<'a, K>(
