@@ -23,6 +23,11 @@ fn errno_error(e: nix::errno::Errno) -> io::Error {
     io::Error::from_raw_os_error(e as i32)
 }
 
+fn log_io_error(err: io::Error, error: String) -> io::Error {
+    log::error!("{error} ({err})");
+    io::Error::new(err.kind(), error)
+}
+
 pub struct Split {
     num: usize,             // maximum size of each split
     pos: usize,             // written bytes of current split
@@ -99,12 +104,6 @@ impl Split {
         self.outgoing.with_extension(self.val.to_string())
     }
 
-    fn mark_failed_err<T>(&mut self, err: &io::Error, error: &str) -> io::Result<T> {
-        self.mark_failed = true;
-        log::error!("{error}");
-        Err(io::Error::new(err.kind(), error))
-    }
-
     #[tracing::instrument(level = "trace")]
     fn outgoing_chunk(&mut self) -> io::Result<()> {
         // link current incoming chunk outgoing
@@ -113,9 +112,10 @@ impl Split {
         };
         let incoming = self.current_incoming_path();
         let outgoing = self.current_outgoing_path();
-        if let Err(err) = file.sync_data() {
-            return self.mark_failed_err(&err, &format!("Cannot sync incoming {incoming:?}"));
-        }
+        file.sync_data().map_err(|err| {
+            self.mark_failed = true;
+            log_io_error(err, format!("Cannot sync incoming {incoming:?}"))
+        })?;
 
         // truncate fallocate'd file to actual bytes written
         if self.pos < self.num {
@@ -127,10 +127,12 @@ impl Split {
                 len = self.pos
             );
             let len = i64::try_from(self.pos).expect("chunk position exceeds usize");
-            if let Err(err) = nix::unistd::ftruncate(file.as_fd(), len).map_err(errno_error) {
-                return self
-                    .mark_failed_err(&err, &format!("Cannot ftruncate incoming {incoming:?}"));
-            }
+            nix::unistd::ftruncate(file.as_fd(), len)
+                .map_err(errno_error)
+                .map_err(|err| {
+                    self.mark_failed = true;
+                    log_io_error(err, format!("Cannot ftruncate incoming {incoming:?}"))
+                })?;
         }
 
         tracing::event!(
@@ -140,18 +142,20 @@ impl Split {
             incoming = format!("{incoming:?}", incoming = incoming),
             outgoing = format!("{outgoing:?}", outgoing = outgoing)
         );
-        if let Err(err) = fs::hard_link(&incoming, &outgoing) {
-            return self.mark_failed_err(&err, &format!("Cannot create new outgoing {outgoing:?}"));
-        }
+        fs::hard_link(&incoming, &outgoing).map_err(|err| {
+            self.mark_failed = true;
+            log_io_error(err, format!("Cannot create new outgoing {outgoing:?}"))
+        })?;
         tracing::event!(
             name: "remove_file",
             tracing::Level::TRACE,
             action = "unlink",
             incoming = format!("{incoming:?}", incoming = incoming)
         );
-        if let Err(err) = fs::remove_file(incoming) {
-            return self.mark_failed_err(&err, &format!("Cannot unlink incoming {outgoing:?}"));
-        }
+        fs::remove_file(incoming).map_err(|err| {
+            self.mark_failed = true;
+            log_io_error(err, format!("Cannot unlink incoming {outgoing:?}"))
+        })?;
         Ok(())
     }
 
@@ -197,13 +201,13 @@ impl Split {
             .write(true)
             .create_new(true)
             .mode(CHUNK_FILE_MODE)
-            .open(&incoming);
+            .open(&incoming)
+            .map_err(|err| {
+                self.mark_failed = true;
+                log_io_error(err, format!("Cannot create new incoming {incoming:?}"))
+            })?;
 
-        if let Err(err) = file {
-            return self.mark_failed_err(&err, &format!("Cannot create new incoming {incoming:?}"));
-        };
-
-        self.file = file.ok();
+        self.file = Some(file);
         self.pos = 0;
 
         let len = i64::try_from(self.num).expect("chunk size exceeds usize");
@@ -225,10 +229,10 @@ impl Split {
         {
             log::warn!("Need more disk space to fallocate {len} bytes for new fragment {incoming:?} ({err}), retrying.");
             self.file = None;
-            if let Err(err) = fs::remove_file(&incoming) {
-                return self
-                    .mark_failed_err(&err, &format!("Cannot unlink new fragment {incoming:?}"));
-            }
+            fs::remove_file(&incoming).map_err(|err| {
+                self.mark_failed = true;
+                log_io_error(err, format!("Cannot unlink new fragment {incoming:?}"))
+            })?;
             // retry
             return Ok(0);
         };
@@ -257,15 +261,8 @@ impl Split {
             return Ok(0);
         }
 
-        let Some(mut file) = self.file.as_ref() else {
-            self.mark_failed = true;
-            log::error!(
-                "Split has unexpectedly closed file at position {total_bytes}, ignoring write request",
-                total_bytes = self.tot
-            );
-            return Ok(0);
-        };
-
+        // we expect file to be open, use_file_or_next checks this
+        let mut file = self.file.as_ref().unwrap();
         let mut slice = buf;
         let n = io::copy(&mut slice, &mut file)?;
 
