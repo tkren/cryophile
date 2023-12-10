@@ -53,7 +53,7 @@ pub fn perform_freeze(
         let config_file = match ConfigFile::new(&config_path) {
             Err(err) => {
                 log::error!("Cannot parse config file {config_path:?}: {err}");
-                return Err(io::Error::new(io::ErrorKind::Other, err));
+                return Err(io::Error::other(err));
             }
             Ok(config_file) => config_file,
         };
