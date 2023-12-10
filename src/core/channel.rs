@@ -10,9 +10,9 @@
 use std::io;
 
 pub fn channel_send_error<T>(e: crossbeam::channel::SendError<T>) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, format!("Channel send error: {e}"))
+    io::Error::other(format!("Channel send error: {e}"))
 }
 
 pub fn channel_recv_error(e: crossbeam::channel::RecvError) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, format!("Channel recv error: {e}"))
+    io::Error::other(format!("Channel recv error: {e}"))
 }

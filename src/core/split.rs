@@ -168,13 +168,10 @@ impl Split {
                 "Split is marked failed at {total_bytes}",
                 total_bytes = self.tot
             );
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!(
-                    "Split is marked failed at {total_bytes}",
-                    total_bytes = self.tot
-                ),
-            ));
+            return Err(io::Error::other(format!(
+                "Split is marked failed at {total_bytes}",
+                total_bytes = self.tot
+            )));
         }
 
         // use file
