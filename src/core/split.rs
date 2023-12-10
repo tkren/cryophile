@@ -7,14 +7,13 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-use std::fs;
-use std::io;
 use std::io::Write;
 use std::os::fd::AsFd;
 use std::os::fd::AsRawFd;
 use std::os::unix::prelude::OpenOptionsExt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::{fmt, fs, io};
 
 use nix::fcntl::FallocateFlags;
 
@@ -33,6 +32,20 @@ pub struct Split {
     outgoing: PathBuf,      // outgoing link prefix
     file: Option<fs::File>, // current output file
     mark_failed: bool,      // Split had an error
+}
+
+impl fmt::Debug for Split {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Split {{ prefix: {prefix:?}, total_bytes: {total_bytes}, chunks: {chunks}, mark_failed: {mark_failed}, file: {file:?}}}",
+            prefix = self.incoming,
+            total_bytes = self.tot,
+            chunks = self.val,
+            mark_failed = self.mark_failed,
+            file = self.file
+        )
+    }
 }
 
 impl Drop for Split {
