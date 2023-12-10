@@ -54,9 +54,16 @@ impl Cat {
         self.tx.to_owned()
     }
 
+    #[tracing::instrument(level = "trace")]
     fn ok_or_retry(&mut self, n: usize) -> io::Result<usize> {
         if n == 0 {
             // reached eof most likely, wait for new path
+            tracing::event!(
+                tracing::Level::TRACE,
+                action = "retry",
+                total_bytes = self.tot,
+                chunks = self.num
+            );
             self.file = None;
             self.pos = 0;
             return Err(io::Error::new(io::ErrorKind::Interrupted, "Retry"));
@@ -85,12 +92,27 @@ impl Default for Cat {
 }
 
 impl io::Read for Cat {
+    #[tracing::instrument(level = "trace", skip(buf))]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Some(mut file) = self.file.as_ref() {
             let n = file.read(buf)?;
+            tracing::event!(
+                tracing::Level::TRACE,
+                action = "read",
+                read_bytes = n,
+                total_bytes = self.tot,
+                chunks = self.num
+            );
             self.ok_or_retry(n)
         } else if let Some(path) = self.rx.recv().map_err(channel_recv_error)? {
             loop {
+                tracing::event!(
+                    tracing::Level::TRACE,
+                    action = "open",
+                    path = format!("{path:?}", path = path),
+                    total_bytes = self.tot,
+                    chunks = self.num
+                );
                 let mut file = match fs::File::options().read(true).open(&path) {
                     Ok(file) => file,
                     Err(err) if err.kind() == io::ErrorKind::Interrupted => {
@@ -105,6 +127,13 @@ impl io::Read for Cat {
                 };
                 self.num += 1;
                 break file.read(buf).and_then(|n| {
+                    tracing::event!(
+                        tracing::Level::TRACE,
+                        action = "read",
+                        read_bytes = n,
+                        total_bytes = self.tot,
+                        chunks = self.num
+                    );
                     self.file = Some(file);
                     self.ok_or_retry(n)
                 });
