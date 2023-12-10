@@ -49,14 +49,8 @@ impl fmt::Debug for Split {
 }
 
 impl Drop for Split {
+    #[tracing::instrument(level = "trace")]
     fn drop(&mut self) {
-        log::trace!(
-            "Split statistics: prefix={prefix:?} total_bytes={total_bytes} chunks={chunks} failed={failed}",
-            prefix=self.incoming,
-            total_bytes=self.tot,
-            chunks=self.val,
-            failed=self.mark_failed
-        );
         // flush data
         if let Err(err) = self.flush() {
             log::error!("Cannot flush: {err}");
@@ -111,6 +105,7 @@ impl Split {
         Err(io::Error::new(err.kind(), error))
     }
 
+    #[tracing::instrument(level = "trace")]
     fn outgoing_chunk(&mut self) -> io::Result<()> {
         // link current incoming chunk outgoing
         let Some(file) = self.file.as_ref() else {
@@ -124,7 +119,13 @@ impl Split {
 
         // truncate fallocate'd file to actual bytes written
         if self.pos < self.num {
-            log::trace!("Truncate {incoming:?} to {len} bytes", len = self.pos);
+            tracing::event!(
+                name: "ftruncate",
+                tracing::Level::TRACE,
+                action = "truncate",
+                incoming = format!("{incoming:?}", incoming = incoming),
+                len = self.pos
+            );
             let len = i64::try_from(self.pos).expect("chunk position exceeds usize");
             if let Err(err) = nix::unistd::ftruncate(file.as_fd(), len).map_err(errno_error) {
                 return self
@@ -132,17 +133,29 @@ impl Split {
             }
         }
 
-        log::trace!("Creating new link {outgoing:?} => {incoming:?}");
+        tracing::event!(
+            name: "hard_link",
+            tracing::Level::TRACE,
+            action = "link",
+            incoming = format!("{incoming:?}", incoming = incoming),
+            outgoing = format!("{outgoing:?}", outgoing = outgoing)
+        );
         if let Err(err) = fs::hard_link(&incoming, &outgoing) {
             return self.mark_failed_err(&err, &format!("Cannot create new outgoing {outgoing:?}"));
         }
-        log::trace!("Unlinking incoming {incoming:?}");
+        tracing::event!(
+            name: "remove_file",
+            tracing::Level::TRACE,
+            action = "unlink",
+            incoming = format!("{incoming:?}", incoming = incoming)
+        );
         if let Err(err) = fs::remove_file(incoming) {
             return self.mark_failed_err(&err, &format!("Cannot unlink incoming {outgoing:?}"));
         }
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace")]
     fn use_file_or_next(&mut self) -> io::Result<usize> {
         assert!(self.pos <= self.num, "file position exceeded max size");
 
@@ -172,7 +185,13 @@ impl Split {
         self.val += 1;
         let incoming = self.current_incoming_path();
 
-        log::trace!("Creating new chunk {incoming:?}");
+        tracing::event!(
+            name: "open",
+            tracing::Level::TRACE,
+            action = "create",
+            incoming = format!("{incoming:?}", incoming = incoming),
+            len = self.pos
+        );
 
         let file = fs::File::options()
             .write(true)
@@ -188,6 +207,14 @@ impl Split {
         self.pos = 0;
 
         let len = i64::try_from(self.num).expect("chunk size exceeds usize");
+        tracing::event!(
+            name: "fallocate",
+            tracing::Level::TRACE,
+            action = "fallocate",
+            incoming = format!("{incoming:?}", incoming = incoming),
+            len = len
+        );
+
         if let Err(err) = nix::fcntl::fallocate(
             self.file.as_ref().unwrap().as_raw_fd(),
             FallocateFlags::empty(),
@@ -209,6 +236,7 @@ impl Split {
         Ok(self.num)
     }
 
+    #[tracing::instrument(level = "trace", skip(buf))]
     fn write_once(&mut self, buf: &[u8]) -> io::Result<usize> {
         let buf_len = buf.len();
         if buf_len == 0 {
@@ -253,6 +281,7 @@ impl Split {
 
 impl io::Write for Split {
     #[inline]
+    #[tracing::instrument(level = "trace", skip(buf))]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.mark_failed {
             log::error!(
@@ -275,24 +304,26 @@ impl io::Write for Split {
             buf.split_at(buf_len)
         };
 
-        log::trace!(
-            "Head remaining={remaining:?} prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
-            remaining=remainder,
-            prefix=self.incoming,
-            total_bytes=self.tot,
-            chunks=self.val
+        tracing::event!(
+            name: "head",
+            tracing::Level::TRACE,
+            head_remaining = remainder,
+            prefix = format!("{prefix:?}", prefix = self.incoming),
+            total_bytes = self.tot,
+            chunks = self.val
         );
 
         // write left slice of length remainder or buf_len
         written += self.write_once(head)?;
 
         if !tail.is_empty() {
-            log::trace!(
-                "Tail remaining={remaining:?} prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
-                remaining = buf_len.saturating_sub(remainder),
-                prefix=self.incoming,
-                total_bytes=self.tot,
-                chunks=self.val
+            tracing::event!(
+                name: "tail",
+                tracing::Level::TRACE,
+                tail_remaining = buf_len.saturating_sub(remainder),
+                prefix = format!("{prefix:?}", prefix = self.incoming),
+                total_bytes = self.tot,
+                chunks = self.val
             );
 
             // write right slice in chunks of length self.num (last chunk at most self.num)
@@ -318,17 +349,11 @@ impl io::Write for Split {
     // }
 
     #[inline]
+    #[tracing::instrument(level = "trace")]
     fn flush(&mut self) -> io::Result<()> {
         let Some(file) = &mut self.file else {
-            log::trace!("Nothing to flush…");
             return Ok(());
         };
-        log::trace!(
-            "Attempting flush: prefix={prefix:?} total_bytes={total_bytes} chunks={chunks}",
-            prefix = self.incoming,
-            total_bytes = self.tot,
-            chunks = self.val
-        );
         file.flush()
     }
 }
