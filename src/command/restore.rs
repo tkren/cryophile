@@ -17,7 +17,7 @@ use crate::crypto::openpgp::{
     build_decryptor, openpgp_error, read_password_fd, secret_key_store, SecretKeyStore,
 };
 use crossbeam::channel::{Receiver, Sender};
-use notify::event::{AccessKind, AccessMode, CreateKind};
+use notify::event::CreateKind;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sequoia_openpgp::policy::StandardPolicy;
 use std::cmp::Reverse;
@@ -140,8 +140,8 @@ fn notify_event_worker(
     let mut current_priority = Reverse(1);
     let mut zero_received: bool = false;
 
-    for result in notify_receiver {
-        match &result.map_err(notify_error)? {
+    for event in notify_receiver {
+        match &event.map_err(notify_error)? {
             notify::Event { kind, paths, attrs }
                 if kind == &EventKind::Create(CreateKind::Folder) =>
             {
@@ -154,27 +154,6 @@ fn notify_event_worker(
                     watcher
                         .watch(backup_dir, RecursiveMode::NonRecursive)
                         .map_err(notify_error)?;
-                }
-            }
-            notify::Event { kind, paths, attrs }
-                if kind == &EventKind::Access(AccessKind::Close(AccessMode::Write)) =>
-            {
-                log::debug!("Received restore fragment: {kind:?} {paths:?} {attrs:?}");
-                for path in paths {
-                    let Some(current_fragment) = Fragment::new(path.as_path()) else {
-                        continue;
-                    };
-                    if current_fragment.priority == Reverse(0) {
-                        log::trace!("Received zero fragment: {current_fragment:?}");
-                        zero_received = true;
-                        continue;
-                    }
-                    current_priority = send_or_push_fragment(
-                        sender,
-                        &mut heap,
-                        current_fragment,
-                        current_priority,
-                    )?;
                 }
             }
             notify::Event {
@@ -204,7 +183,6 @@ fn notify_event_worker(
                         current_priority,
                     )?;
                 }
-                continue;
             }
             notify::Event {
                 kind, paths, attrs, ..
