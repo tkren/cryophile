@@ -17,7 +17,7 @@ use std::{fmt, fs, io};
 
 use nix::fcntl::FallocateFlags;
 
-use crate::core::constants::CHUNK_FILE_MODE;
+use super::constants::CHUNK_FILE_MODE;
 
 fn errno_error(e: nix::errno::Errno) -> io::Error {
     io::Error::from_raw_os_error(e as i32)
