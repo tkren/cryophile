@@ -9,9 +9,14 @@
 
 use std::{
     cmp::{Ordering, Reverse},
-    fmt,
-    path::{Path, PathBuf},
+    collections::BinaryHeap,
+    fmt, io,
+    path::PathBuf,
 };
+
+use crossbeam::channel::Sender;
+
+use super::channel::channel_send_error;
 
 #[derive(Clone, Debug, Eq)]
 pub struct Fragment {
@@ -49,16 +54,85 @@ impl PartialEq for Fragment {
 }
 
 impl Fragment {
-    pub fn new(path: &Path) -> Option<Self> {
+    pub fn new(path: PathBuf) -> Option<Self> {
         let Some(extension) = path.extension() else {
             return None;
         };
         let Some(priority) = extension.to_str()?.parse::<i32>().ok() else {
             return None;
         };
-        Some(Fragment {
+        Some(Self {
             priority: Reverse(priority),
-            path: path.to_path_buf(),
+            path,
         })
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.priority.0 == 0
+    }
+}
+
+#[derive(Debug)]
+pub struct FragmentQueue {
+    sender: Sender<Option<PathBuf>>,
+    heap: BinaryHeap<Fragment>,
+    current: Reverse<i32>,
+    zero: bool,
+}
+
+impl FragmentQueue {
+    pub fn new(sender: Sender<Option<PathBuf>>) -> Self {
+        Self {
+            sender,
+            heap: BinaryHeap::new(),
+            current: Reverse(1),
+            zero: false,
+        }
+    }
+
+    pub fn send(&mut self, fragment: Fragment) -> io::Result<bool> {
+        if fragment.is_zero() {
+            log::trace!("Received zero fragment: {fragment:?}");
+            self.zero = true;
+            return Ok(false);
+        }
+        if fragment.priority == self.current {
+            log::trace!("Sending fragment {fragment}");
+            self.sender
+                .send(Some(fragment.path))
+                .map_err(channel_send_error)?;
+            self.current = Reverse(fragment.priority.0 + 1);
+            Ok(true)
+        } else {
+            log::debug!(
+                "Ignoring fragment {fragment}, waiting for new fragment with priority {priority:?}",
+                priority = self.current
+            );
+            self.heap.push(fragment);
+            Ok(false)
+        }
+    }
+
+    pub fn send_backlog(&mut self) -> io::Result<()> {
+        // empty heap
+        while let Some(min_fragment) = self.heap.pop() {
+            if !self.send(min_fragment)? {
+                break; // we need to wait for the next fragment with current_priority
+            };
+        }
+        Ok(())
+    }
+
+    pub fn send_zero_maybe(&mut self) -> io::Result<bool> {
+        if !self.zero {
+            return Ok(false);
+        }
+        if self.heap.is_empty() {
+            // we found the zero file, signal shutdown
+            self.sender.send(None).map_err(channel_send_error)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 }
