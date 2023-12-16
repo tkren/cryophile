@@ -9,8 +9,7 @@
 
 use crate::cli::{Cli, Restore};
 use crate::core::cat::Cat;
-use crate::core::channel::channel_send_error;
-use crate::core::fragment::Fragment;
+use crate::core::fragment::{Fragment, FragmentQueue};
 use crate::core::notify::notify_error;
 use crate::core::path::{Queue, SpoolPathComponents};
 use crate::crypto::openpgp::{
@@ -20,8 +19,6 @@ use crossbeam::channel::{Receiver, Sender};
 use notify::event::CreateKind;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sequoia_openpgp::policy::StandardPolicy;
-use std::cmp::Reverse;
-use std::collections::BinaryHeap;
 use std::os::unix::prelude::{MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::{fs, io, thread};
@@ -82,7 +79,7 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
     let sender = concat.tx();
 
     let handle = thread::spawn(move || {
-        notify_event_worker(&restore_dir, &mut watcher, &notify_receiver, &sender)
+        notify_event_worker(&restore_dir, &mut watcher, &notify_receiver, sender)
     });
 
     let copy_result = fragment_worker(concat, secret_key_store, policy, output)?;
@@ -106,50 +103,26 @@ fn fragment_worker(
     Ok(bytes_written)
 }
 
-fn send_or_push_fragment(
-    sender: &Sender<Option<PathBuf>>,
-    heap: &mut BinaryHeap<Fragment>,
-    fragment: Fragment,
-    priority: Reverse<i32>,
-) -> io::Result<Reverse<i32>> {
-    if fragment.priority == priority {
-        log::trace!("Sending fragment {fragment}");
-        let Reverse(prio) = fragment.priority;
-        sender
-            .send(Some(fragment.path))
-            .map_err(channel_send_error)?;
-        Ok(Reverse(prio + 1))
-    } else {
-        log::debug!(
-            "Ignoring fragment {fragment}, waiting for new fragment with priority {priority:?}"
-        );
-        heap.push(fragment);
-        Ok(priority)
-    }
-}
-
 fn notify_event_worker(
     backup_dir: &Path,
     watcher: &mut RecommendedWatcher,
     notify_receiver: &Receiver<Result<notify::Event, notify::Error>>,
-    sender: &Sender<Option<PathBuf>>,
+    sender: Sender<Option<PathBuf>>,
 ) -> io::Result<()> {
     log::trace!("Starting notify_event_worker…");
 
-    let mut heap: BinaryHeap<Fragment> = BinaryHeap::new();
-    let mut current_priority = Reverse(1);
-    let mut zero_received: bool = false;
+    let mut queue = FragmentQueue::new(sender);
 
     for event in notify_receiver {
-        match &event.map_err(notify_error)? {
+        match event.map_err(notify_error)? {
             notify::Event { kind, paths, attrs }
-                if kind == &EventKind::Create(CreateKind::Folder) =>
+                if kind == EventKind::Create(CreateKind::Folder) =>
             {
                 log::debug!("Received restore input path: {kind:?} {paths:?} {attrs:?}");
                 for path in paths {
                     log::trace!("Watching path {path:?}, unwatching path {backup_dir:?}");
                     watcher
-                        .watch(path, RecursiveMode::NonRecursive)
+                        .watch(&path, RecursiveMode::NonRecursive)
                         .map_err(notify_error)?;
                     watcher
                         .watch(backup_dir, RecursiveMode::NonRecursive)
@@ -158,30 +131,20 @@ fn notify_event_worker(
             }
             notify::Event {
                 kind, paths, attrs, ..
-            } if kind == &EventKind::Create(CreateKind::File) => {
+            } if kind == EventKind::Create(CreateKind::File) => {
                 for path in paths {
-                    if let Ok(metadata) = fs::metadata(path) {
+                    if let Ok(metadata) = fs::metadata(&path) {
                         let nlink = metadata.nlink();
                         if nlink > 1 {
                             log::trace!(
-                                "Found hard-linked file ({nlink:?}): {kind:?} {paths:?} {attrs:?}"
+                                "Found hard-linked file ({nlink:?}): {kind:?} {path:?} {attrs:?}"
                             );
                         }
                     }
-                    let Some(current_fragment) = Fragment::new(path.as_path()) else {
+                    let Some(current_fragment) = Fragment::new(path) else {
                         continue;
                     };
-                    if current_fragment.priority == Reverse(0) {
-                        log::trace!("Received zero fragment: {current_fragment:?}");
-                        zero_received = true;
-                        continue;
-                    }
-                    current_priority = send_or_push_fragment(
-                        sender,
-                        &mut heap,
-                        current_fragment,
-                        current_priority,
-                    )?;
+                    queue.send(current_fragment)?;
                 }
             }
             notify::Event {
@@ -190,23 +153,8 @@ fn notify_event_worker(
                 log::trace!("Ignoring event {kind:?} {paths:?} {attrs:?}");
             }
         }
-        loop {
-            let Some(min_fragment) = heap.pop() else {
-                break; // empty heap
-            };
-            let next_priority =
-                send_or_push_fragment(sender, &mut heap, min_fragment, current_priority)?;
-            if next_priority == current_priority {
-                break; // we need to wait for the next fragment with current_priority
-            } else {
-                current_priority = next_priority; // we found a fragment, let's search for next_priority
-            }
-        }
-        if zero_received {
-            // we found the zero file, signal shutdown
-            sender.send(None).map_err(channel_send_error)?;
-            break;
-        }
+        queue.send_backlog()?;
+        queue.send_zero_maybe()?;
     }
     log::trace!("Finishing notify_event_worker…");
     Ok(())
