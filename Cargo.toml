@@ -44,7 +44,7 @@ tokio = { version = "~1.35.0", features = ["full"] }
 toml = "~0.8.8"
 tracing = { version = "~0.1.40", features = ["log"] }
 tracing-subscriber = "~0.3.18"
-ulid = "~1.1.0"
+ulid = { version = "~1.1.0", features = ["std"] }
 uuid = { version = "~1.6.1", features = ["serde"] }
 xdg = "~2.5.2"
 walkdir = "~2.4.0"

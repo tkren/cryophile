@@ -15,12 +15,15 @@ use crate::core::Split;
 use crate::crypto::openpgp::{build_encryptor, openpgp_error, storage_encryption_certs, Keyring};
 
 use sequoia_openpgp::policy::StandardPolicy;
+use ulid::Ulid;
 
 use std::fs;
 use std::io::{self, Write};
 use std::os::unix::prelude::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 
+// https://github.com/rust-lang/rust-clippy/issues/11631 breaks unwrap_or_else(Ulid::new)
+#[allow(clippy::unwrap_or_default)]
 pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
     log::info!("BACKUP…");
 
@@ -28,7 +31,7 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
         cli.spool.clone(),
         backup.vault,
         backup.prefix.clone(),
-        backup.ulid.or(backup.timestamp).unwrap(),
+        backup.ulid.or(backup.timestamp).unwrap_or_else(Ulid::new),
     );
     let backup_dir = spool_path_components.to_queue_path(Queue::Backup)?;
     let freeze_dir = spool_path_components.to_queue_path(Queue::Freeze)?;
