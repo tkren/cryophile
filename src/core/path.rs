@@ -21,7 +21,7 @@ use uuid::Uuid;
 #[derive(Clone, Debug, Default)]
 pub struct SpoolPathComponents {
     pub spool: PathBuf,
-    pub vault: Uuid,
+    pub vault: Option<Uuid>,
     pub prefix: Option<PathBuf>,
     pub id: Option<Ulid>,
 }
@@ -30,7 +30,7 @@ impl SpoolPathComponents {
     pub fn new(spool: PathBuf, vault: Uuid, prefix: Option<PathBuf>, id: Ulid) -> Self {
         Self {
             spool,
-            vault,
+            vault: Some(vault),
             prefix,
             id: Some(id),
         }
@@ -39,9 +39,45 @@ impl SpoolPathComponents {
     pub fn from_prefix(spool: PathBuf, vault: Uuid, prefix: PathBuf) -> Self {
         Self {
             spool,
-            vault,
+            vault: Some(vault),
             prefix: Some(prefix),
             id: None,
+        }
+    }
+
+    pub fn from_spool(spool: PathBuf) -> Self {
+        Self {
+            spool,
+            vault: None,
+            prefix: None,
+            id: None,
+        }
+    }
+
+    pub fn with_vault(self, vault: Uuid) -> Self {
+        Self {
+            spool: self.spool,
+            vault: Some(vault),
+            prefix: self.prefix,
+            id: self.id,
+        }
+    }
+
+    pub fn with_prefix(self, prefix: PathBuf) -> Self {
+        Self {
+            spool: self.spool,
+            vault: self.vault,
+            prefix: Some(prefix),
+            id: self.id,
+        }
+    }
+
+    pub fn with_id(self, id: Ulid) -> Self {
+        Self {
+            spool: self.spool,
+            vault: self.vault,
+            prefix: self.prefix,
+            id: Some(id),
         }
     }
 }
@@ -135,28 +171,31 @@ fn validate_prefix(prefix: Option<&PathBuf>) -> io::Result<PathBuf> {
 
 impl SpoolPathComponents {
     pub fn to_queue_path(&self, queue: Queue) -> io::Result<PathBuf> {
-        let mut backup_dir = PathBuf::new();
+        let mut path = PathBuf::new();
 
         // backup_dir starts with the spool directory
-        backup_dir.push(&self.spool);
+        path.push(&self.spool);
 
         // next up: queue path
-        backup_dir.push::<PathBuf>(queue.into());
+        path.push::<PathBuf>(queue.into());
 
-        log::trace!("Base directory for {queue:?} queue: {backup_dir:?}");
+        log::trace!("Base directory for {queue:?} queue: {path:?}");
 
         // next we add a vault as lower-case hyphenated UUID
-        let vault_dir = build_canonical_path(SpoolNameComponent::Vault(self.vault))?;
-        backup_dir.push(vault_dir);
+        let Some(vault) = self.vault else {
+            return Ok(path);
+        };
+        let vault_dir = build_canonical_path(SpoolNameComponent::Vault(vault))?;
+        path.push(vault_dir);
 
         // then the prefix key, potentially containing a path of length >= 1
         let prefix_path = validate_prefix(self.prefix.as_ref())?;
         let prefix_dir = build_canonical_path(SpoolNameComponent::Prefix(prefix_path))?;
-        backup_dir.push(prefix_dir);
+        path.push(prefix_dir);
 
         // finally, the current ULID path (timestamp + random) if available
         let Some(id) = self.id else {
-            return Ok(backup_dir);
+            return Ok(path);
         };
         log::trace!(
             "Using ULID with timestamp={ulid_timestamp:?} and random={ulid_random:x?}",
@@ -164,9 +203,9 @@ impl SpoolPathComponents {
             ulid_random = id.random(),
         );
         let ulid_dir = build_canonical_path(SpoolNameComponent::Id(id))?;
-        backup_dir.push(ulid_dir);
+        path.push(ulid_dir);
 
-        Ok(backup_dir)
+        Ok(path)
     }
 }
 
