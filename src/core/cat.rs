@@ -7,15 +7,16 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
+use std::sync::{mpsc, Mutex};
 use std::{fmt, fs, io, path::PathBuf};
 
-use crossbeam::channel::{Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender};
 
 use super::channel::channel_recv_error;
 
 pub struct Cat {
     tx: Sender<Option<PathBuf>>,
-    rx: Receiver<Option<PathBuf>>,
+    rx: Mutex<Receiver<Option<PathBuf>>>,
     pos: usize,             // written bytes of current file
     tot: usize,             // total bytes written
     num: u64,               // number of files concatenated
@@ -38,10 +39,10 @@ impl fmt::Debug for Cat {
 
 impl Cat {
     pub fn new() -> Self {
-        let (tx, rx) = crossbeam::channel::unbounded();
+        let (tx, rx) = mpsc::channel();
         Self {
             tx,
-            rx,
+            rx: Mutex::new(rx),
             pos: 0,
             num: 0,
             tot: 0,
@@ -74,9 +75,9 @@ impl Cat {
     }
 
     pub fn clear(&mut self) {
-        let (tx, rx) = crossbeam::channel::unbounded();
+        let (tx, rx) = mpsc::channel();
         self.tx = tx;
-        self.rx = rx;
+        self.rx = Mutex::new(rx);
         self.pos = 0;
         self.tot = 0;
         self.num = 0;
@@ -103,8 +104,13 @@ impl io::Read for Cat {
                 total_bytes = self.tot,
                 chunks = self.num
             );
-            self.ok_or_retry(n)
-        } else if let Some(path) = self.rx.recv().map_err(channel_recv_error)? {
+            return self.ok_or_retry(n);
+        }
+        let opt_path = {
+            let rx = self.rx.lock().unwrap();
+            rx.recv().map_err(channel_recv_error)?
+        };
+        if let Some(path) = opt_path {
             loop {
                 tracing::event!(
                     tracing::Level::TRACE,

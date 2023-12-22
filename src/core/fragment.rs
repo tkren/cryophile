@@ -14,7 +14,7 @@ use std::{
     path::PathBuf,
 };
 
-use crossbeam::channel::Sender;
+use std::sync::mpsc::Sender;
 
 use super::channel::channel_send_error;
 

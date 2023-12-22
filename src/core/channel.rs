@@ -8,11 +8,12 @@
 // to those terms.
 
 use std::io;
+use std::sync::mpsc::{RecvError, SendError};
 
-pub fn channel_send_error<T>(e: crossbeam::channel::SendError<T>) -> io::Error {
+pub fn channel_send_error<T>(e: SendError<T>) -> io::Error {
     io::Error::other(format!("Channel send error: {e}"))
 }
 
-pub fn channel_recv_error(e: crossbeam::channel::RecvError) -> io::Error {
+pub fn channel_recv_error(e: RecvError) -> io::Error {
     io::Error::other(format!("Channel recv error: {e}"))
 }
