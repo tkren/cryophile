@@ -15,12 +15,12 @@ use crate::core::path::{Queue, SpoolPathComponents};
 use crate::crypto::openpgp::{
     build_decryptor, openpgp_error, read_password_fd, secret_key_store, SecretKeyStore,
 };
-use crossbeam::channel::{Receiver, Sender};
 use notify::event::CreateKind;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sequoia_openpgp::policy::StandardPolicy;
 use std::os::unix::prelude::{MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::{fs, io, thread};
 
 fn build_writer(path: Option<&PathBuf>) -> io::Result<Box<dyn io::Write>> {
@@ -59,7 +59,7 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
     );
     let restore_dir = spool_path_components.to_queue_path(Queue::Restore)?;
 
-    let (notify_sender, notify_receiver) = crossbeam::channel::bounded(10);
+    let (notify_sender, notify_receiver) = mpsc::channel();
 
     let mut watcher =
         RecommendedWatcher::new(notify_sender, notify::Config::default()).map_err(notify_error)?;
