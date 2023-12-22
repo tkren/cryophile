@@ -141,4 +141,7 @@ pub struct Restore {
 
     #[arg(short, long, help = "vault", value_parser = parse_uuid)]
     pub vault: uuid::Uuid,
+
+    #[arg(short, long, help = "backup ulid", value_parser = parse_ulid)]
+    pub ulid: Ulid,
 }
