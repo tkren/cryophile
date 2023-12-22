@@ -17,14 +17,12 @@ age = ["dep:age"]
 
 [dependencies]
 age = { version = "~0.9.2", features = ["ssh"], optional = true }
-anyhow = { version = "~1.0.75", features = ["backtrace"] }
+anyhow = { version = "~1.0.76", features = ["backtrace"] }
 aws-config = "~1.1.1"
-aws-sdk-s3 = "~1.8.0"
+aws-sdk-s3 = "~1.10.0"
 aws-types = "~1.1.1"
 clap = { version = "~4.4.11", features = ["cargo", "derive"] }
 chrono = "~0.4.31"
-crossbeam = "~0.8.2"
-crossbeam-utils = "~0.8.17"
 env_logger = "~0.10.1"
 futures = "~0.3.29"
 log = "~0.4.20"
@@ -39,8 +37,8 @@ serde_derive = "~1.0.193"
 sequoia-openpgp = "~1.17.0"
 thiserror = "~1.0.51"
 thread_io = "~0.3.1"
-time = "~0.3.30"
-tokio = { version = "~1.35.0", features = ["full"] }
+time = "~0.3.31"
+tokio = { version = "~1.35.1", features = ["full"] }
 toml = "~0.8.8"
 tracing = { version = "~0.1.40", features = ["log"] }
 tracing-subscriber = "~0.3.18"
