@@ -7,8 +7,6 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-pub const DEFAULT_BUF_SIZE: usize = 8192;
-
 pub const DEFAULT_CHUNK_SIZE: usize = 512;
 
 pub static DEFAULT_SPOOL_PATH: &str = "/var/spool/permafrust";

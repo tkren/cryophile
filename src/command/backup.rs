@@ -7,9 +7,9 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-use crate::cli::{constants::DEFAULT_BUF_SIZE, Backup, Cli};
+use crate::cli::{Backup, Cli};
 use crate::compression::CompressionType;
-use crate::core::constants::{CHUNK_FILE_MODE, CHUNK_FILE_PREFIX};
+use crate::core::constants::{CHUNK_FILE_MODE, CHUNK_FILE_PREFIX, DEFAULT_BUF_SIZE};
 use crate::core::path::{use_dir_atomic_create_maybe, CreateDirectory, Queue, SpoolPathComponents};
 use crate::core::Split;
 use crate::crypto::openpgp::{build_encryptor, openpgp_error, storage_encryption_certs, Keyring};
