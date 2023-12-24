@@ -9,19 +9,55 @@
 
 use crate::cli::{Cli, Restore};
 use crate::core::cat::Cat;
-use crate::core::fragment::{Fragment, FragmentQueue};
+use crate::core::fragment::FragmentQueue;
 use crate::core::notify::notify_error;
-use crate::core::path::{Queue, SpoolPathComponents};
+use crate::core::path::{use_dir_atomic_create_maybe, CreateDirectory, Queue, SpoolPathComponents};
+use crate::core::watch::Watch;
 use crate::crypto::openpgp::{
     build_decryptor, openpgp_error, read_password_fd, secret_key_store, SecretKeyStore,
 };
 use notify::event::CreateKind;
-use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{EventKind, RecursiveMode, Watcher};
 use sequoia_openpgp::policy::StandardPolicy;
-use std::os::unix::prelude::{MetadataExt, OpenOptionsExt};
+use std::os::unix::prelude::OpenOptionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread::JoinHandle;
 use std::{fs, io, thread};
+use walkdir::WalkDir;
+
+pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
+    log::info!("RESTORE…");
+
+    let output: Box<dyn io::Write> = build_writer(restore.output.as_ref())?;
+
+    let spool_path_components = SpoolPathComponents::new(
+        cli.spool.clone(),
+        restore.vault,
+        restore.prefix.clone(),
+        restore.ulid,
+    );
+    let restore_ulid_dir = spool_path_components.to_queue_path(Queue::Restore)?;
+
+    let concat = Cat::new();
+    let fragment_queue = FragmentQueue::new(concat.tx());
+
+    let watch = Box::new(Watch::new()?);
+
+    // Create and watch restore directory, or use restore directory from a previous run.
+    // No need to watch once we could fully walked the downloaded restore directory (e.g., if restore was interrupted).
+    let handle = walk_or_watch_restore_dir(&restore_ulid_dir, watch, fragment_queue)?;
+
+    let policy = &StandardPolicy::new();
+    let password = restore.pass_fd.and_then(read_password_fd);
+    let secret_key_store = secret_key_store(policy, restore.keyring.iter().flatten(), password)?;
+
+    let copy_result = fragment_worker(concat, secret_key_store, policy, output)?;
+    log::info!("Received total of {copy_result} bytes");
+
+    handle
+        .map(|h| h.join().expect("could not join thread"))
+        .unwrap_or(Ok(()))
+}
 
 fn build_writer(path: Option<&PathBuf>) -> io::Result<Box<dyn io::Write>> {
     let writer: Box<dyn io::Write> = match path {
@@ -47,45 +83,107 @@ fn build_writer(path: Option<&PathBuf>) -> io::Result<Box<dyn io::Write>> {
     Ok(writer)
 }
 
-pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
-    log::info!("RESTORE…");
+fn walk_or_watch_restore_dir(
+    path: &Path,
+    watch: Box<Watch>,
+    mut queue: FragmentQueue,
+) -> io::Result<Option<JoinHandle<io::Result<()>>>> {
+    match use_dir_atomic_create_maybe(path, CreateDirectory::Recursive) {
+        Ok(_) => {
+            // we could create path, now watch for incoming files
+            let handle = watch_restore_dir(path, watch, queue)?;
+            return Ok(Some(handle));
+        }
+        Err(err) if err.kind() == io::ErrorKind::AlreadyExists && path.is_dir() => {
+            // reuse directory and walk
+        }
+        Err(err) => {
+            return Err(err);
+        }
+    };
 
-    let output: Box<dyn io::Write> = build_writer(restore.output.as_ref())?;
+    // enter path, only retrieving direct children
+    let walk = WalkDir::new(path)
+        .follow_root_links(false)
+        .min_depth(1)
+        .max_depth(1);
 
-    let spool_path_components = SpoolPathComponents::from_prefix(
-        cli.spool.clone(),
-        restore.vault,
-        restore.prefix.clone().unwrap(),
-    );
-    let restore_dir = spool_path_components.to_queue_path(Queue::Restore)?;
+    for entry in walk {
+        match &entry {
+            Err(e) => {
+                log::warn!("Cannot walk {entry:?}, ignoring: {e}");
+                continue;
+            }
+            Ok(dir_entry) => {
+                if dir_entry.path_is_symlink() {
+                    log::debug!("Ignoring symlink {dir_entry:?}");
+                    continue;
+                }
+                let dir_entry_path = dir_entry.path();
+                if dir_entry_path.is_file() {
+                    log::trace!("Found file {dir_entry_path:?}");
+                    queue.send_path(dir_entry_path.to_path_buf())?;
+                    continue;
+                }
+                log::debug!("Ignoring path {dir_entry:?}");
+            }
+        }
+    }
+    queue.send_backlog()?;
+    if queue.send_zero_maybe()? {
+        Ok(None)
+    } else {
+        let handle = watch_restore_dir(path, watch, queue)?;
+        Ok(Some(handle))
+    }
+}
 
-    let (notify_sender, notify_receiver) = mpsc::channel();
-
-    let mut watcher =
-        RecommendedWatcher::new(notify_sender, notify::Config::default()).map_err(notify_error)?;
-
-    let policy = &StandardPolicy::new();
-    let password = restore.pass_fd.and_then(read_password_fd);
-    let secret_key_store = secret_key_store(policy, restore.keyring.iter().flatten(), password)?;
-
-    //use_dir_atomic_create_maybe(&restore_dir, CreateDirectory::Recursive)?;
-
-    log::trace!("Watching {restore_dir:?}");
-    watcher
-        .watch(&restore_dir, RecursiveMode::Recursive)
+fn watch_restore_dir(
+    path: &Path,
+    mut watch: Box<Watch>,
+    queue: FragmentQueue,
+) -> io::Result<JoinHandle<io::Result<()>>> {
+    log::trace!("Watching {path:?}");
+    watch
+        .watcher
+        .watch(path, RecursiveMode::NonRecursive)
         .map_err(notify_error)?;
 
-    let concat = Cat::new();
-    let sender = concat.tx();
+    let handle = thread::spawn(move || notify_event_worker(&watch, queue));
+    Ok(handle)
+}
 
-    let handle = thread::spawn(move || {
-        notify_event_worker(&restore_dir, &mut watcher, &notify_receiver, sender)
-    });
-
-    let copy_result = fragment_worker(concat, secret_key_store, policy, output)?;
-    log::info!("Received total of {copy_result} bytes");
-
-    handle.join().expect("could not join thread")
+fn notify_event_worker(watch: &Watch, mut queue: FragmentQueue) -> io::Result<()> {
+    log::trace!("Starting notify_event_worker…");
+    let notify_receiver = watch.rx.lock().expect("Cannot lock watch receiver");
+    for event in notify_receiver.iter() {
+        match event.map_err(notify_error)? {
+            notify::Event {
+                kind: EventKind::Create(CreateKind::File),
+                paths,
+                ..
+            } => {
+                for path in paths {
+                    if path.is_symlink() {
+                        log::warn!("Ignoring symlink {path:?}");
+                        continue;
+                    }
+                    queue.send_path(path)?;
+                }
+            }
+            notify::Event {
+                kind, paths, attrs, ..
+            } => {
+                log::trace!("Ignoring event {kind:?} {paths:?} {attrs:?}");
+            }
+        }
+        queue.send_backlog()?;
+        if queue.send_zero_maybe()? {
+            break;
+        };
+    }
+    log::trace!("Finishing notify_event_worker…");
+    Ok(())
 }
 
 fn fragment_worker(
@@ -101,61 +199,4 @@ fn fragment_worker(
     let bytes_written = io::copy(&mut decryptor, &mut buffered_writer)?;
     log::trace!("Finishing fragment_worker…");
     Ok(bytes_written)
-}
-
-fn notify_event_worker(
-    backup_dir: &Path,
-    watcher: &mut RecommendedWatcher,
-    notify_receiver: &Receiver<Result<notify::Event, notify::Error>>,
-    sender: Sender<Option<PathBuf>>,
-) -> io::Result<()> {
-    log::trace!("Starting notify_event_worker…");
-
-    let mut queue = FragmentQueue::new(sender);
-
-    for event in notify_receiver {
-        match event.map_err(notify_error)? {
-            notify::Event { kind, paths, attrs }
-                if kind == EventKind::Create(CreateKind::Folder) =>
-            {
-                log::debug!("Received restore input path: {kind:?} {paths:?} {attrs:?}");
-                for path in paths {
-                    log::trace!("Watching path {path:?}, unwatching path {backup_dir:?}");
-                    watcher
-                        .watch(&path, RecursiveMode::NonRecursive)
-                        .map_err(notify_error)?;
-                    watcher
-                        .watch(backup_dir, RecursiveMode::NonRecursive)
-                        .map_err(notify_error)?;
-                }
-            }
-            notify::Event {
-                kind, paths, attrs, ..
-            } if kind == EventKind::Create(CreateKind::File) => {
-                for path in paths {
-                    if let Ok(metadata) = fs::metadata(&path) {
-                        let nlink = metadata.nlink();
-                        if nlink > 1 {
-                            log::trace!(
-                                "Found hard-linked file ({nlink:?}): {kind:?} {path:?} {attrs:?}"
-                            );
-                        }
-                    }
-                    let Some(current_fragment) = Fragment::new(path) else {
-                        continue;
-                    };
-                    queue.send(current_fragment)?;
-                }
-            }
-            notify::Event {
-                kind, paths, attrs, ..
-            } => {
-                log::trace!("Ignoring event {kind:?} {paths:?} {attrs:?}");
-            }
-        }
-        queue.send_backlog()?;
-        queue.send_zero_maybe()?;
-    }
-    log::trace!("Finishing notify_event_worker…");
-    Ok(())
 }
