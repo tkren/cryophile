@@ -16,7 +16,7 @@ use std::{
 
 use std::sync::mpsc::Sender;
 
-use super::channel::channel_send_error;
+use super::watch::channel_send_error;
 
 #[derive(Clone, Debug, Eq)]
 pub struct Fragment {
