@@ -33,6 +33,8 @@ use openpgp::{
     Cert, Fingerprint, KeyID,
 };
 
+use crate::core::constants::DEFAULT_BUF_SIZE;
+
 pub type Keyring<'a> = Vec<ValidKeyAmalgamation<'a, PublicParts, UnspecifiedRole, bool>>;
 
 pub fn openpgp_error(e: anyhow::Error) -> io::Error {
@@ -286,6 +288,7 @@ where
 {
     log::trace!("Setting up decryption…");
     let decryptor = DecryptorBuilder::from_reader(input)?
+        .buffer_size(DEFAULT_BUF_SIZE) // we do not verify, no need for a larger buffer
         .mapping(false)
         .with_policy(policy, None, secret_key_store)
         .context("Decryption failed")?;
