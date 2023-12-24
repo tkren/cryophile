@@ -12,7 +12,7 @@ use std::{fmt, fs, io, path::PathBuf};
 
 use std::sync::mpsc::{Receiver, Sender};
 
-use super::channel::channel_recv_error;
+use super::watch::channel_recv_error;
 
 pub struct Cat {
     tx: Sender<Option<PathBuf>>,
@@ -22,6 +22,7 @@ pub struct Cat {
     num: u64,               // number of files concatenated
     file: Option<fs::File>, // current input file
     mark_failed: bool,      // Cat had an error
+    completed: bool,
 }
 
 impl fmt::Debug for Cat {
@@ -48,6 +49,7 @@ impl Cat {
             tot: 0,
             file: None,
             mark_failed: false,
+            completed: false,
         }
     }
 
@@ -83,6 +85,7 @@ impl Cat {
         self.num = 0;
         self.file = None;
         self.mark_failed = false;
+        self.completed = false;
     }
 }
 
@@ -95,6 +98,15 @@ impl Default for Cat {
 impl io::Read for Cat {
     #[tracing::instrument(level = "trace", skip(buf))]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self.completed {
+            tracing::event!(
+                tracing::Level::TRACE,
+                action = "complete",
+                total_bytes = self.tot,
+                chunks = self.num
+            );
+            return Ok(0);
+        }
         if let Some(mut file) = self.file.as_ref() {
             let n = file.read(buf)?;
             tracing::event!(
@@ -107,6 +119,12 @@ impl io::Read for Cat {
             return self.ok_or_retry(n);
         }
         let opt_path = {
+            tracing::event!(
+                tracing::Level::TRACE,
+                action = "receive",
+                total_bytes = self.tot,
+                chunks = self.num
+            );
             let rx = self.rx.lock().unwrap();
             rx.recv().map_err(channel_recv_error)?
         };
@@ -146,7 +164,13 @@ impl io::Read for Cat {
             }
         } else {
             // self.file is None and received None from channel, just shutdown
-            self.clear();
+            tracing::event!(
+                tracing::Level::TRACE,
+                action = "completed",
+                total_bytes = self.tot,
+                chunks = self.num
+            );
+            self.completed = true;
             Ok(0)
         }
     }
