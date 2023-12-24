@@ -90,6 +90,12 @@ impl FragmentQueue {
         }
     }
 
+    pub fn send_path(&mut self, path: PathBuf) -> io::Result<bool> {
+        Fragment::new(path)
+            .map(|frag| self.send(frag))
+            .unwrap_or(Ok(false))
+    }
+
     pub fn send(&mut self, fragment: Fragment) -> io::Result<bool> {
         if fragment.is_zero() {
             log::trace!("Received zero fragment: {fragment:?}");
