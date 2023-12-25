@@ -8,6 +8,8 @@
 // to those terms.
 
 use crate::cli::{Cli, Restore};
+use crate::compression::decompressor::Decompressor;
+use crate::compression::CompressionType;
 use crate::core::cat::Cat;
 use crate::core::fragment::FragmentQueue;
 use crate::core::notify::notify_error;
@@ -51,7 +53,13 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
     let password = restore.pass_fd.and_then(read_password_fd);
     let secret_key_store = secret_key_store(policy, restore.keyring.iter().flatten(), password)?;
 
-    let copy_result = fragment_worker(concat, secret_key_store, policy, output)?;
+    let copy_result = fragment_worker(
+        concat,
+        secret_key_store,
+        policy,
+        restore.compression,
+        output,
+    )?;
     log::info!("Received total of {copy_result} bytes");
 
     handle
@@ -190,13 +198,22 @@ fn fragment_worker(
     concat: Cat,
     secret_key_store: SecretKeyStore,
     policy: &StandardPolicy,
-    output: Box<dyn io::Write>,
+    compression: Option<CompressionType>,
+    mut output: Box<dyn io::Write>,
 ) -> io::Result<u64> {
     log::trace!("Starting fragment_worker…");
-    let mut buffered_writer = io::BufWriter::new(output);
     let reader = io::BufReader::new(concat);
-    let mut decryptor = build_decryptor(secret_key_store, policy, reader).map_err(openpgp_error)?;
-    let bytes_written = io::copy(&mut decryptor, &mut buffered_writer)?;
+    let decryptor = build_decryptor(secret_key_store, policy, reader).map_err(openpgp_error)?;
+    // guess compression algorithm by default
+    let mut decompressor = Decompressor::new(decryptor);
+    if let Some(compression_type) = compression {
+        // force decompression with compression_type
+        log::info!("Decompressing restore stream with {compression_type:?}…");
+        decompressor = decompressor.with_compression(compression_type);
+    } else {
+        log::info!("Guessing decompression algorithm from restore stream…");
+    }
+    let bytes_written = decompressor.copy_to(&mut output)?;
     log::trace!("Finishing fragment_worker…");
     Ok(bytes_written)
 }
