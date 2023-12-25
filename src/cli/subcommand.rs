@@ -127,6 +127,9 @@ pub struct Thaw {}
 #[derive(Parser, Debug)]
 #[command(about = "Not shown")]
 pub struct Restore {
+    #[arg(short = 'C', long, help = "compression type", value_enum)]
+    pub compression: Option<CompressionType>,
+
     #[arg(short, long, help = "keyring", action = clap::ArgAction::Append, required = true, value_parser = parse_keyring)]
     pub keyring: Vec<Vec<Cert>>,
 
