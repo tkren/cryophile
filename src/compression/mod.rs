@@ -7,7 +7,8 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-pub mod encoder;
 pub mod compression_type;
+pub mod decompressor;
+pub mod encoder;
 
 pub use self::compression_type::CompressionType;
