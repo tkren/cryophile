@@ -9,7 +9,7 @@
 
 use std::io;
 
-use super::Split;
+use crate::core::Split;
 
 pub trait CompleteEncoder: io::Write {
     fn complete(&mut self) -> io::Result<()> {
