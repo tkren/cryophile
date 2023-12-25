@@ -37,12 +37,19 @@ use crate::core::constants::DEFAULT_BUF_SIZE;
 
 pub type Keyring<'a> = Vec<ValidKeyAmalgamation<'a, PublicParts, UnspecifiedRole, bool>>;
 
-pub fn openpgp_error(e: anyhow::Error) -> io::Error {
-    let e = match e.downcast::<io::Error>() {
-        Ok(e) => return e,
-        Err(e) => e,
-    };
-    io::Error::other(e)
+pub fn openpgp_error(error: anyhow::Error) -> io::Error {
+    let mut reason = String::new();
+    for cause in error.chain() {
+        reason.push_str(cause.to_string().as_str());
+        if cause.source().is_some() {
+            reason.push_str(": ");
+        }
+    }
+    if let Ok(err) = error.downcast::<io::Error>() {
+        io::Error::new(err.kind(), reason)
+    } else {
+        io::Error::other(reason)
+    }
 }
 
 pub fn storage_encryption_certs<'a, K>(
@@ -240,10 +247,9 @@ impl DecryptionHelper for SecretKeyStore {
     where
         D: FnMut(SymmetricAlgorithm, &SessionKey) -> bool,
     {
-        let mut recipient = None;
-        for pkesk in pkesks {
+        for (num, pkesk) in pkesks.iter().enumerate() {
             let keyid = pkesk.recipient();
-            log::trace!("Decrypting {pkesk:?} for {keyid}…");
+            log::trace!("Trying to decrypt session key {num} for recipient {keyid}…");
             if let Some(pair) = self.secret_keys.get_mut(keyid) {
                 let mut dec = pair.unlock(self.password.as_ref())?;
                 let decryptor = dec.as_mut();
@@ -252,14 +258,27 @@ impl DecryptionHelper for SecretKeyStore {
                     .map(|(algo, session_key)| decrypt(algo, &session_key))
                     .unwrap_or(false)
                 {
-                    let fp = self.key_identities.get_mut(keyid).unwrap();
-                    recipient = Some(fp.clone());
-                    break;
+                    let fingerprint = self.key_identities.get_mut(keyid).unwrap();
+                    let recipient = Some(fingerprint.clone());
+                    log::trace!("Decrypted session key {num} for recipient {keyid}");
+                    return Ok(recipient);
                 }
+                log::warn!("Decrypting session key {num} failed for recipient {keyid}");
+            } else {
+                log::warn!(
+                    "Cannot find secret key to decrypt session key {num} for recipient {keyid}"
+                );
             }
         }
-        log::trace!("Decryption completed for {recipient:?}…");
-        Ok(recipient)
+        let sk_keyids = self
+            .secret_keys
+            .keys()
+            .map(|keyid| keyid.to_string())
+            .collect::<Vec<_>>();
+        log::error!("Cannot decrypt session keys using any of the secret keys for {sk_keyids:?}");
+        Err(anyhow::anyhow!(
+            "Cannot decrypt session keys using any of the secret keys"
+        ))
     }
 }
 
