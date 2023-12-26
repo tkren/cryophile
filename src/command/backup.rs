@@ -10,7 +10,7 @@
 use crate::cli::{Backup, Cli};
 use crate::compression::CompressionType;
 use crate::core::constants::{CHUNK_FILE_MODE, CHUNK_FILE_PREFIX, DEFAULT_BUF_SIZE};
-use crate::core::path::{use_dir_atomic_create_maybe, CreateDirectory, Queue, SpoolPathComponents};
+use crate::core::path::{CreateDirectory, Queue, SpoolPathComponents};
 use crate::core::Split;
 use crate::crypto::openpgp::{build_encryptor, openpgp_error, storage_encryption_certs, Keyring};
 
@@ -33,8 +33,10 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
         backup.prefix.clone(),
         backup.ulid.or(backup.timestamp).unwrap_or_else(Ulid::new),
     );
-    let backup_dir = spool_path_components.to_queue_path(Queue::Backup)?;
-    let freeze_dir = spool_path_components.to_queue_path(Queue::Freeze)?;
+    let backup_dir =
+        spool_path_components.with_queue_path(Queue::Backup, CreateDirectory::Recursive)?;
+    let freeze_dir =
+        spool_path_components.with_queue_path(Queue::Freeze, CreateDirectory::Recursive)?;
 
     #[cfg(feature = "age")]
     {
@@ -67,12 +69,6 @@ pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
 
     // setup backup directory and splitter encryption sink
     // after we have some certificates for storage encryption
-
-    // mkdir -p backup_dir: let the first instance of two concurrent
-    // permafrust backup calls win in case they started with the same timestamp
-    // https://rcrowley.org/2010/01/06/things-unix-can-do-atomically.html
-    use_dir_atomic_create_maybe(&backup_dir, CreateDirectory::Recursive)?;
-    use_dir_atomic_create_maybe(&freeze_dir, CreateDirectory::Recursive)?;
 
     // TODO signal handling, Ctrl+C does not finish stream https://rust-cli.github.io/book/in-depth/signals.html
     let mut splitter = Split::new(&backup_dir, &freeze_dir, CHUNK_FILE_PREFIX, backup.size);
