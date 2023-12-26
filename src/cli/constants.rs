@@ -7,6 +7,13 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
+use std::sync::LazyLock;
+
+use regex::Regex;
+
 pub const DEFAULT_CHUNK_SIZE: usize = 512;
 
 pub static DEFAULT_SPOOL_PATH: &str = "/var/spool/permafrust";
+
+pub static UNSAFE_PREFIX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"[^a-zA-Z0-9[/()!'*._-]]+"#).expect("broken regex"));

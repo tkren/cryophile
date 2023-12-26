@@ -20,6 +20,8 @@ use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::Cert;
 use ulid::Ulid;
 
+use super::UNSAFE_PREFIX;
+
 pub(crate) fn parse_chunk_size(s: &str) -> Result<usize, String> {
     let parse_config = parse_size::Config::new()
         .with_binary()
@@ -84,14 +86,21 @@ pub(crate) fn parse_ulid(s: &str) -> Result<Ulid, String> {
 
 pub(crate) fn parse_prefix(s: &str) -> Result<PathBuf, String> {
     if s.is_empty() {
-        return Err(String::from_str("prefix cannot be empty").map_err(|e| e.to_string())?);
+        return Err("prefix cannot be empty".to_string());
     }
+
+    // https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
+    if let Some(unsafe_match) = UNSAFE_PREFIX.find(s) {
+        return Err(format!(
+            "prefix must not contain unsafe characters matching {u}, found {m}",
+            u = UNSAFE_PREFIX.as_str(),
+            m = unsafe_match.as_str(),
+        ));
+    }
+
     let path = PathBuf::from_str(s).map_err(|e| e.to_string())?;
     if path.has_root() {
-        return Err(
-            String::from_str("prefix cannot have a root component or be absolute")
-                .map_err(|e| e.to_string())?,
-        );
+        return Err("prefix cannot have a root component or be absolute".to_string());
     }
     Ok(path)
 }

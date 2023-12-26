@@ -139,7 +139,7 @@ pub struct Restore {
     #[arg(short, long, help = "output file", value_parser = value_parser!(PathBuf))]
     pub output: Option<PathBuf>,
 
-    #[arg(short, long, help = "prefix path in vault", value_parser = value_parser!(PathBuf))]
+    #[arg(short, long, help = "prefix path in vault", value_parser = parse_prefix)]
     pub prefix: Option<PathBuf>,
 
     #[arg(short, long, help = "vault", value_parser = parse_uuid)]

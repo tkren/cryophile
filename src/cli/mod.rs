@@ -16,7 +16,7 @@ mod subcommand;
 use clap::{value_parser, Parser};
 use std::path::PathBuf;
 
-pub use self::constants::{DEFAULT_CHUNK_SIZE, DEFAULT_SPOOL_PATH};
+pub use self::constants::{DEFAULT_CHUNK_SIZE, DEFAULT_SPOOL_PATH, UNSAFE_PREFIX};
 pub use self::error::CliError;
 pub use self::result::CliResult;
 pub use self::subcommand::{Backup, Command, Freeze, Restore, Thaw};
