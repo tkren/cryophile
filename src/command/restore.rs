@@ -13,7 +13,7 @@ use crate::compression::CompressionType;
 use crate::core::cat::Cat;
 use crate::core::fragment::FragmentQueue;
 use crate::core::notify::notify_error;
-use crate::core::path::{use_dir_atomic_create_maybe, CreateDirectory, Queue, SpoolPathComponents};
+use crate::core::path::{CreateDirectory, Queue, SpoolPathComponents};
 use crate::core::watch::Watch;
 use crate::crypto::openpgp::{
     build_decryptor, openpgp_error, read_password_fd, secret_key_store, SecretKeyStore,
@@ -38,7 +38,6 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
         restore.prefix.clone(),
         restore.ulid,
     );
-    let restore_ulid_dir = spool_path_components.to_queue_path(Queue::Restore)?;
 
     let concat = Cat::new();
     let fragment_queue = FragmentQueue::new(concat.tx());
@@ -47,7 +46,7 @@ pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
 
     // Create and watch restore directory, or use restore directory from a previous run.
     // No need to watch once we could fully walked the downloaded restore directory (e.g., if restore was interrupted).
-    let handle = walk_or_watch_restore_dir(&restore_ulid_dir, watch, fragment_queue)?;
+    let handle = walk_or_watch_restore_dir(&spool_path_components, watch, fragment_queue)?;
 
     let policy = &StandardPolicy::new();
     let password = restore.pass_fd.and_then(read_password_fd);
@@ -92,26 +91,31 @@ fn build_writer(path: Option<&PathBuf>) -> io::Result<Box<dyn io::Write>> {
 }
 
 fn walk_or_watch_restore_dir(
-    path: &Path,
+    spool_path_components: &SpoolPathComponents,
     watch: Box<Watch>,
     mut queue: FragmentQueue,
 ) -> io::Result<Option<JoinHandle<io::Result<()>>>> {
-    match use_dir_atomic_create_maybe(path, CreateDirectory::Recursive) {
-        Ok(_) => {
-            // we could create path, now watch for incoming files
-            let handle = watch_restore_dir(path, watch, queue)?;
-            return Ok(Some(handle));
-        }
-        Err(err) if err.kind() == io::ErrorKind::AlreadyExists && path.is_dir() => {
-            // reuse directory and walk
-        }
-        Err(err) => {
-            return Err(err);
-        }
-    };
+    let path =
+        match spool_path_components.with_queue_path(Queue::Restore, CreateDirectory::Recursive) {
+            Ok(path) => {
+                // we could create path, now watch for incoming files
+                let handle = watch_restore_dir(path.as_path(), watch, queue)?;
+                return Ok(Some(handle));
+            }
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
+                let path = spool_path_components.to_queue_path(Queue::Restore)?;
+                if !path.is_dir() {
+                    return Err(err); // a non-directory is in the way, just bail out
+                }
+                path // reuse directory and walk
+            }
+            Err(err) => {
+                return Err(err);
+            }
+        };
 
     // enter path, only retrieving direct children
-    let walk = WalkDir::new(path)
+    let walk = WalkDir::new(path.as_path())
         .follow_root_links(false)
         .min_depth(1)
         .max_depth(1);
@@ -141,7 +145,7 @@ fn walk_or_watch_restore_dir(
     if queue.send_zero_maybe()? {
         Ok(None)
     } else {
-        let handle = watch_restore_dir(path, watch, queue)?;
+        let handle = watch_restore_dir(path.as_path(), watch, queue)?;
         Ok(Some(handle))
     }
 }
