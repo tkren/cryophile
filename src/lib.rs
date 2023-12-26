@@ -22,13 +22,13 @@ use cli::Command;
 pub use config::Config;
 use env_logger::Builder;
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 
 use crate::command::backup;
 use crate::command::freeze;
 use crate::command::restore;
 use crate::command::thaw;
-use crate::core::path::CreateDirectory;
 
 pub fn base_directory_profile(_subcommand: &Command) -> Result<xdg::BaseDirectories, CliError> {
     match xdg::BaseDirectories::with_prefix(clap::crate_name!()) {
@@ -75,7 +75,7 @@ pub fn run(config: &Config) -> Result<(), CliError> {
     log::trace!("Using base state directory {base_pathbuf:?}");
 
     let spool = &config.cli.spool;
-    core::path::use_dir_atomic_create_maybe(spool, CreateDirectory::No)?;
+    fs::read_dir(spool)?; // PermissionDenied, NotADirectory, NotFound, etc.
     log::trace!("Using spool directory {spool:?}");
 
     // perform requested command
