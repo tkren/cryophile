@@ -104,3 +104,17 @@ pub(crate) fn parse_prefix(s: &str) -> Result<PathBuf, String> {
     }
     Ok(path)
 }
+
+pub(crate) fn parse_spool(s: &str) -> Result<PathBuf, String> {
+    if s.is_empty() {
+        return Err("spool cannot be empty".to_string());
+    }
+    let path = PathBuf::from_str(s).map_err(|e| e.to_string())?;
+    if path.is_symlink() {
+        return Err("spool cannot be a symlink".to_string());
+    }
+    if !path.is_dir() {
+        return Err("spool must be a directory".to_string());
+    }
+    Ok(path)
+}

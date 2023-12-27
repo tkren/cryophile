@@ -13,11 +13,12 @@ pub mod parse;
 pub mod result;
 mod subcommand;
 
-use clap::{value_parser, Parser};
+use clap::Parser;
 use std::path::PathBuf;
 
 pub use self::constants::{DEFAULT_CHUNK_SIZE, DEFAULT_SPOOL_PATH, UNSAFE_PREFIX};
 pub use self::error::CliError;
+use self::parse::parse_spool;
 pub use self::result::CliResult;
 pub use self::subcommand::{Backup, Command, Freeze, Restore, Thaw};
 
@@ -32,7 +33,7 @@ pub struct Cli {
 
     /// Spool directory containing all backup and restore queues
     #[arg(
-        short = 'S', long, value_parser = value_parser!(PathBuf),
+        short = 'S', long, value_parser = parse_spool,
         default_value_os_t = PathBuf::from(DEFAULT_SPOOL_PATH),
         value_name = "DIRECTORY",
         help = "Spool directory containing all backup and restore queues",
