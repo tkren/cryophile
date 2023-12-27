@@ -9,18 +9,33 @@
 
 use std::{env, fmt, io};
 
+use crate::config::ParseConfigError;
+
 use super::CliResult;
 
 #[derive(thiserror::Error, fmt::Debug)]
 pub enum CliError {
     #[error("BaseDirError: {0} {1}")]
     BaseDirError(xdg::BaseDirectoriesError, CliResult),
+    #[error("ConfigurationError: {0} {1}")]
+    ConfigurationError(ParseConfigError, CliResult),
     #[error("EnvError: {0} {1}")]
     EnvError(env::VarError, CliResult),
     #[error("IoError: {0} {1}")]
     IoError(io::Error, CliResult),
     #[error("LogError: Cannot call set_logger more than once {1}")]
     LogError(log::SetLoggerError, CliResult),
+}
+
+impl From<ParseConfigError> for CliError {
+    fn from(error: ParseConfigError) -> Self {
+        match error {
+            ParseConfigError::TomlDeError(_) => {
+                CliError::ConfigurationError(error, CliResult::ConfigError)
+            }
+            ParseConfigError::IoError(err) => CliError::IoError(err, CliResult::IoError),
+        }
+    }
 }
 
 impl From<io::Error> for CliError {
