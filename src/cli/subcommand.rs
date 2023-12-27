@@ -27,7 +27,7 @@ use ulid::Ulid;
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Queue input for upload
+    /// Compress, encrypt input and queue for upload
     #[command(arg_required_else_help = false)]
     Backup(Backup),
     /// Upload backup
@@ -36,7 +36,7 @@ pub enum Command {
     /// Download backup
     #[command(arg_required_else_help = false)]
     Thaw(Thaw),
-    /// Uncompress and decrypt downloaded backup files
+    /// Decrypt, uncompress downloaded backup files
     #[command(arg_required_else_help = false)]
     Restore(Restore),
 }

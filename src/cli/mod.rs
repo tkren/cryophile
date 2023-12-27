@@ -30,12 +30,12 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
 
-    /// Spool directory containing all backup and restore state
+    /// Spool directory containing all backup and restore queues
     #[arg(
         short = 'S', long, value_parser = value_parser!(PathBuf),
         default_value_os_t = PathBuf::from(DEFAULT_SPOOL_PATH),
-        value_name = "FILE",
-        help = "Spool directory containing all backup and restore state",
+        value_name = "DIRECTORY",
+        help = "Spool directory containing all backup and restore queues",
     )]
     pub spool: PathBuf,
 
