@@ -28,6 +28,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+use crate::cli::DEFAULT_CONFIG_PATH;
 use crate::command::backup;
 use crate::command::freeze;
 use crate::command::restore;
@@ -106,7 +107,7 @@ pub fn read_config(path: &Path) -> Result<ConfigFile, CliError> {
         Err(err) => match err {
             ParseConfigError::IoError(e) => {
                 log::debug!("Cannot read config from {path:?}: {e}");
-                let path = PathBuf::from("/etc/permafrust/permafrust.toml");
+                let path = PathBuf::from(DEFAULT_CONFIG_PATH);
                 Ok(ConfigFile::new(path.as_path()).unwrap_or_default())
             }
             _ => Err(err.into()),
@@ -117,10 +118,18 @@ pub fn read_config(path: &Path) -> Result<ConfigFile, CliError> {
 pub fn run(cli: Cli) -> Result<CliResult, CliError> {
     log_versions();
 
-    // read config
     let base_directories = base_directory_profile(&cli.command).unwrap();
-    let user_config_path = base_directories.get_config_file("permafrust.toml");
-    let config_file = read_config(&user_config_path)?;
+
+    // read config file
+    let config_file = if cli.config != PathBuf::from(DEFAULT_CONFIG_PATH) {
+        // always fail if --config is given
+        ConfigFile::new(cli.config.as_path())?
+    } else {
+        // do not fail if we cannot read standard config locations, unless there is a config syntax error
+        let user_config_path = base_directories.get_config_file("permafrust.toml");
+        read_config(&user_config_path)?
+    };
+
     let config = Config::new(base_directories, cli, config_file);
 
     // setup base directory
