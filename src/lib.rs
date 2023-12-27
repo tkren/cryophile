@@ -16,19 +16,46 @@ pub mod config;
 pub mod core;
 mod crypto;
 
+use clap::error::ErrorKind;
 use cli::error::CliError;
+use cli::Cli;
 use cli::CliResult;
 use cli::Command;
 pub use config::Config;
 use env_logger::Builder;
 use std::env;
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 
 use crate::command::backup;
 use crate::command::freeze;
 use crate::command::restore;
 use crate::command::thaw;
+use crate::config::ConfigFile;
+use crate::config::ParseConfigError;
+
+pub fn on_clap_error(err: clap::error::Error) -> Cli {
+    err.print().expect("Error writing error");
+
+    let code: CliResult = match err.use_stderr() {
+        true => CliResult::Usage,
+        false => match err.kind() {
+            ErrorKind::DisplayHelp => CliResult::Ok,
+            ErrorKind::DisplayVersion => CliResult::Ok,
+            ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => CliResult::Usage,
+            _ => CliResult::Usage,
+        },
+    };
+
+    // perform clap::util::safe_exit(code)
+    use std::io::Write;
+
+    let _ = std::io::stdout().lock().flush();
+    let _ = std::io::stderr().lock().flush();
+
+    std::process::exit(code as i32);
+}
 
 pub fn base_directory_profile(_subcommand: &Command) -> Result<xdg::BaseDirectories, CliError> {
     match xdg::BaseDirectories::with_prefix(clap::crate_name!()) {
@@ -50,7 +77,11 @@ pub fn setup(debug: u8, quiet: bool) -> Result<(), CliError> {
             _ => env.filter_or("PERMAFRUST_LOG", "info"),
         }
     };
-    Builder::new().parse_env(env).try_init()?;
+    if let Err(err) = Builder::new().parse_env(env).try_init() {
+        let err: CliError = err.into();
+        eprintln!("Cannot initialize permafrust: {err}");
+        return Err(err);
+    }
     Ok(())
 }
 
@@ -69,7 +100,29 @@ pub fn log_versions() {
     );
 }
 
-pub fn run(config: &Config) -> Result<(), CliError> {
+pub fn read_config(path: &Path) -> Result<ConfigFile, CliError> {
+    match ConfigFile::new(path) {
+        Ok(c) => Ok(c),
+        Err(err) => match err {
+            ParseConfigError::IoError(e) => {
+                log::debug!("Cannot read config from {path:?}: {e}");
+                let path = PathBuf::from("/etc/permafrust/permafrust.toml");
+                Ok(ConfigFile::new(path.as_path()).unwrap_or_default())
+            }
+            _ => Err(err.into()),
+        },
+    }
+}
+
+pub fn run(cli: Cli) -> Result<CliResult, CliError> {
+    log_versions();
+
+    // read config
+    let base_directories = base_directory_profile(&cli.command).unwrap();
+    let user_config_path = base_directories.get_config_file("permafrust.toml");
+    let config_file = read_config(&user_config_path)?;
+    let config = Config::new(base_directories, cli, config_file);
+
     // setup base directory
     let base_pathbuf: PathBuf = core::path::use_base_dir(&config.base)?;
     log::trace!("Using base state directory {base_pathbuf:?}");
@@ -85,5 +138,5 @@ pub fn run(config: &Config) -> Result<(), CliError> {
         Command::Restore(restore) => restore::perform_restore(&config.cli, restore)?,
         Command::Thaw(thaw) => thaw::perform_thaw(&config.cli, thaw)?,
     };
-    Ok(())
+    Ok(CliResult::Ok)
 }
