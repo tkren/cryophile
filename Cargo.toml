@@ -13,11 +13,12 @@ publish = false
 
 [features]
 default = []
-age = ["dep:age"]
+# ignore age feature for now
+#age = ["dep:age"]
 
 [dependencies]
-age = { version = "~0.9.2", features = ["ssh"], optional = true }
-anyhow = { version = "~1.0.76", features = ["backtrace"] }
+#age = { version = "~0.9.2", features = ["ssh"], optional = true }
+anyhow = { version = "~1.0.77", features = ["backtrace"] }
 aws-config = "~1.1.1"
 aws-sdk-s3 = "~1.11.0"
 aws-types = "~1.1.1"
