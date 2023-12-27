@@ -12,6 +12,8 @@ use std::{
     process::{ExitCode, Termination},
 };
 
+use super::CliError;
+
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum CliResult {
@@ -36,5 +38,18 @@ impl Termination for CliResult {
             _ => log::error!("Terminating with error(s) {self}"),
         };
         ExitCode::from(self as u8)
+    }
+}
+
+impl From<CliError> for CliResult {
+    fn from(error: CliError) -> Self {
+        log::error!("{error}");
+        match error {
+            CliError::BaseDirError(_, code) => code,
+            CliError::ConfigurationError(_, code) => code,
+            CliError::EnvError(_, code) => code,
+            CliError::IoError(_, code) => code,
+            CliError::LogError(_, code) => code,
+        }
     }
 }
