@@ -22,6 +22,9 @@ sudo sysctl fs.inotify.max_user_instances=512
 
 ```shell
 sq key generate --cipher-suite cv25519 --can-encrypt storage --cannot-authenticate --cannot-sign --output permafrust-key.pgp
+```
+
+```shell
 sq key extract-cert --output permafrust-cert.pgp permafrust-key.pgp
 ```
 
@@ -65,6 +68,17 @@ Expiration time: 2025-12-26 14:22:02 UTC (creation time + P1095DT62781S)
       Key flags: data-at-rest encryption
 
 ```
+
+## Configuration
+
+Default configuration will be read from
+`~/.config/permafrust/permafrust.toml`, and if this file is not
+available then `/etc/permafrust/permafrust.toml` will be tried
+next. If both fail to exist, the standard configuration will be
+empty. If you pass `--config path/to/permafrust.toml`, `permafrust`
+will only read `path/to/permafrust.toml` and fail if the file does not
+exist.
+
 
 ## Update dependencies
 
