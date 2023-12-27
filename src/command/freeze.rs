@@ -43,28 +43,6 @@ pub fn perform_freeze(
     let mut watcher =
         RecommendedWatcher::new(tx, notify::Config::default()).map_err(notify_error)?;
 
-    let config_path = if let Some(config) = &freeze.config {
-        config.to_path_buf()
-    } else {
-        base_directories.get_config_file("permafrust.toml")
-    };
-
-    let config = if config_path.exists() {
-        let config_file = match ConfigFile::new(&config_path) {
-            Err(err) => {
-                log::error!("Cannot parse config file {config_path:?}: {err}");
-                return Err(io::Error::other(err));
-            }
-            Ok(config_file) => config_file,
-        };
-        Some(config_file)
-    } else {
-        log::warn!("Configuration {config_path:?} does not exist, ignoring configuration updates");
-        None
-    };
-
-    log::trace!("Config: {config:#?}");
-
     let spool_path_components = SpoolPathComponents::from_spool(cli.spool.clone());
     let freeze_dir = spool_path_components.to_queue_path(Queue::Freeze)?;
 
