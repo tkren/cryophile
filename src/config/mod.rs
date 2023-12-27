@@ -9,11 +9,21 @@
 
 mod configfile;
 
+use xdg::BaseDirectories;
+
 use crate::cli::Cli;
 
 pub use self::configfile::ConfigFile;
+pub use self::configfile::ParseConfigError;
 
 pub struct Config {
     pub base: xdg::BaseDirectories,
     pub cli: Cli,
+    pub file: ConfigFile,
+}
+
+impl Config {
+    pub fn new(base: BaseDirectories, cli: Cli, file: ConfigFile) -> Self {
+        Self { base, cli, file }
+    }
 }
