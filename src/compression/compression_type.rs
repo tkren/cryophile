@@ -8,8 +8,9 @@
 // to those terms.
 
 use clap::ValueEnum;
+use serde_derive::Deserialize;
 
-#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, ValueEnum)]
 pub enum CompressionType {
     #[default]
     None,
