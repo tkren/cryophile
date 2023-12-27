@@ -142,10 +142,10 @@ pub fn run(cli: Cli) -> Result<CliResult, CliError> {
 
     // perform requested command
     match &config.cli.command {
-        Command::Backup(backup) => backup::perform_backup(&config.cli, backup)?,
-        Command::Freeze(freeze) => freeze::perform_freeze(&config.cli, freeze, &config.base)?,
-        Command::Restore(restore) => restore::perform_restore(&config.cli, restore)?,
-        Command::Thaw(thaw) => thaw::perform_thaw(&config.cli, thaw)?,
+        Command::Backup(backup) => backup::perform_backup(&config, backup)?,
+        Command::Freeze(freeze) => freeze::perform_freeze(&config, freeze)?,
+        Command::Restore(restore) => restore::perform_restore(&config, restore)?,
+        Command::Thaw(thaw) => thaw::perform_thaw(&config, thaw)?,
     };
     Ok(CliResult::Ok)
 }

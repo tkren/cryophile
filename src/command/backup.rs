@@ -7,12 +7,13 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-use crate::cli::{Backup, Cli};
+use crate::cli::Backup;
 use crate::compression::CompressionType;
 use crate::core::constants::{CHUNK_FILE_MODE, CHUNK_FILE_PREFIX, DEFAULT_BUF_SIZE};
 use crate::core::path::{CreateDirectory, Queue, SpoolPathComponents};
 use crate::core::Split;
 use crate::crypto::openpgp::{build_encryptor, openpgp_error, storage_encryption_certs, Keyring};
+use crate::Config;
 
 use sequoia_openpgp::policy::StandardPolicy;
 use ulid::Ulid;
@@ -24,11 +25,11 @@ use std::path::{Path, PathBuf};
 
 // https://github.com/rust-lang/rust-clippy/issues/11631 breaks unwrap_or_else(Ulid::new)
 #[allow(clippy::unwrap_or_default)]
-pub fn perform_backup(cli: &Cli, backup: &Backup) -> io::Result<()> {
+pub fn perform_backup(config: &Config, backup: &Backup) -> io::Result<()> {
     log::info!("BACKUP…");
 
     let spool_path_components = SpoolPathComponents::new(
-        cli.spool.clone(),
+        config.cli.spool.clone(),
         backup.vault,
         backup.prefix.clone(),
         backup.ulid.or(backup.timestamp).unwrap_or_else(Ulid::new),

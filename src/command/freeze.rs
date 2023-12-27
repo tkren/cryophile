@@ -7,24 +7,19 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-use crate::cli::{Cli, Freeze};
-use crate::config::ConfigFile;
+use crate::cli::Freeze;
 use crate::core::aws;
 use crate::core::notify::notify_error;
 use crate::core::path::{Queue, SpoolPathComponents};
+use crate::Config;
 use notify::event::{AccessKind, AccessMode, CreateKind, RemoveKind};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
 use std::sync::mpsc;
 use std::{fs, io};
 use walkdir::WalkDir;
-use xdg::BaseDirectories;
 
-pub fn perform_freeze(
-    cli: &Cli,
-    freeze: &Freeze,
-    base_directories: &BaseDirectories,
-) -> io::Result<()> {
+pub fn perform_freeze(config: &Config, _freeze: &Freeze) -> io::Result<()> {
     log::info!("FREEZE…");
 
     let aws_config_future = aws::aws_config(None);
@@ -43,7 +38,7 @@ pub fn perform_freeze(
     let mut watcher =
         RecommendedWatcher::new(tx, notify::Config::default()).map_err(notify_error)?;
 
-    let spool_path_components = SpoolPathComponents::from_spool(cli.spool.clone());
+    let spool_path_components = SpoolPathComponents::from_spool(config.cli.spool.clone());
     let freeze_dir = spool_path_components.to_queue_path(Queue::Freeze)?;
 
     watch_read_dir(&mut watcher, &freeze_dir, RecursiveMode::Recursive)?;

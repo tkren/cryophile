@@ -7,10 +7,10 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-use crate::cli::{Cli, Thaw};
+use crate::{cli::Thaw, Config};
 use std::io;
 
-pub fn perform_thaw(_cli: &Cli, _thaw: &Thaw) -> io::Result<()> {
+pub fn perform_thaw(_config: &Config, _thaw: &Thaw) -> io::Result<()> {
     log::info!("THAW…");
 
     Ok(())

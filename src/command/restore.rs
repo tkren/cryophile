@@ -7,7 +7,7 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-use crate::cli::{Cli, Restore};
+use crate::cli::Restore;
 use crate::compression::decompressor::Decompressor;
 use crate::compression::CompressionType;
 use crate::core::cat::Cat;
@@ -18,6 +18,7 @@ use crate::core::watch::Watch;
 use crate::crypto::openpgp::{
     build_decryptor, openpgp_error, read_password_fd, secret_key_store, SecretKeyStore,
 };
+use crate::Config;
 use notify::event::CreateKind;
 use notify::{EventKind, RecursiveMode, Watcher};
 use sequoia_openpgp::policy::StandardPolicy;
@@ -27,13 +28,13 @@ use std::thread::JoinHandle;
 use std::{fs, io, thread};
 use walkdir::WalkDir;
 
-pub fn perform_restore(cli: &Cli, restore: &Restore) -> io::Result<()> {
+pub fn perform_restore(config: &Config, restore: &Restore) -> io::Result<()> {
     log::info!("RESTORE…");
 
     let output: Box<dyn io::Write> = build_writer(restore.output.as_ref())?;
 
     let spool_path_components = SpoolPathComponents::new(
-        cli.spool.clone(),
+        config.cli.spool.clone(),
         restore.vault,
         restore.prefix.clone(),
         restore.ulid,
