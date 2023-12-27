@@ -115,10 +115,7 @@ pub struct Backup {
 
 #[derive(Parser, Debug)]
 #[command(about = "Not shown")]
-pub struct Freeze {
-    #[arg(short, long, help = "config file", value_parser = value_parser!(PathBuf))]
-    pub config: Option<PathBuf>,
-}
+pub struct Freeze {}
 
 #[derive(Parser, Debug)]
 #[command(about = "Not shown")]
