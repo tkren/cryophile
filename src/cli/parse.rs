@@ -118,3 +118,14 @@ pub(crate) fn parse_spool(s: &str) -> Result<PathBuf, String> {
     }
     Ok(path)
 }
+
+pub(crate) fn parse_config(s: &str) -> Result<PathBuf, String> {
+    if s.is_empty() {
+        return Err("config cannot be empty".to_string());
+    }
+    let path = PathBuf::from_str(s).map_err(|e| e.to_string())?;
+    if path.is_dir() {
+        return Err("config cannot be a directory".to_string());
+    }
+    Ok(path)
+}

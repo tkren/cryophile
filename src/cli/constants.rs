@@ -15,5 +15,7 @@ pub const DEFAULT_CHUNK_SIZE: usize = 512;
 
 pub static DEFAULT_SPOOL_PATH: &str = "/var/spool/permafrust";
 
+pub static DEFAULT_CONFIG_PATH: &str = "/etc/permafrust/permafrust.toml";
+
 pub static UNSAFE_PREFIX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"[^a-zA-Z0-9[/()!'*._-]]+"#).expect("broken regex"));
