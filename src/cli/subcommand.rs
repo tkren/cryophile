@@ -115,7 +115,16 @@ pub struct Backup {
 
 #[derive(Parser, Debug)]
 #[command(about = "Not shown")]
-pub struct Freeze {}
+pub struct Freeze {
+    #[arg(requires = "ulid", short, long, help = "prefix path in vault", value_parser = parse_prefix)]
+    pub prefix: Option<PathBuf>,
+
+    #[arg(requires = "vault", short, long, help = "backup ulid", value_parser = parse_ulid)]
+    pub ulid: Option<Ulid>,
+
+    #[arg(requires = "prefix", short, long, help = "vault", value_parser = parse_uuid)]
+    pub vault: Option<uuid::Uuid>,
+}
 
 #[derive(Parser, Debug)]
 #[command(about = "Not shown")]
