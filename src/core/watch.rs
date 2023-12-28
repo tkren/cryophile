@@ -9,12 +9,12 @@
 
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::io;
-use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, RecvError, SendError};
 use std::sync::{mpsc, Mutex};
 use tempfile::TempDir;
 use tokio::sync::mpsc::Sender;
 
+use super::fragment::Fragment;
 use super::notify::notify_error;
 
 pub fn channel_send_error<T>(e: SendError<T>) -> io::Error {
@@ -25,20 +25,35 @@ pub fn channel_recv_error(e: RecvError) -> io::Error {
     io::Error::other(format!("Channel recv error: {e}"))
 }
 
+pub fn tokio_send_error<T>(err: tokio::sync::mpsc::error::SendError<T>) -> io::Error {
+    io::Error::other(format!("Tokio send error: {err}"))
+}
+
+pub fn tokio_recv_error(err: tokio::sync::mpsc::error::TryRecvError) -> io::Error {
+    io::Error::other(format!("Tokio recv error: {err}"))
+}
+
 pub struct Watch {
     pub rx: Mutex<Receiver<notify::Result<Event>>>,
     pub watcher: RecommendedWatcher,
     pub shutdown: TempDir,
-    _handler: Option<Sender<Option<PathBuf>>>,
+    handler: Option<Sender<Option<Fragment>>>,
 }
 
 impl Watch {
-    pub fn new(handler: Option<Sender<Option<PathBuf>>>) -> io::Result<Self> {
+    pub fn new(handler: Option<Sender<Option<Fragment>>>) -> io::Result<Self> {
         // here we can shutdown the watch
         let shutdown = tempfile::tempdir()?;
         let (tx, rx) = mpsc::channel();
-        let mut watcher =
-            RecommendedWatcher::new(tx, notify::Config::default()).map_err(notify_error)?;
+        let mut watcher = RecommendedWatcher::new(
+            move |res| {
+                futures::executor::block_on(async {
+                    tx.send(res).await.unwrap();
+                })
+            },
+            notify::Config::default(),
+        )
+        .map_err(notify_error)?;
         // let watcher monitor the shutdown path
         watcher
             .watch(shutdown.path(), RecursiveMode::NonRecursive)
@@ -48,7 +63,15 @@ impl Watch {
             rx: Mutex::new(rx),
             watcher,
             shutdown,
-            _handler: handler,
+            handler,
         })
+    }
+
+    pub async fn notify(&self, fragment: Option<Fragment>) -> io::Result<()> {
+        if let Some(h) = &self.handler {
+            h.send(fragment).await.map_err(tokio_send_error)
+        } else {
+            Ok(())
+        }
     }
 }
