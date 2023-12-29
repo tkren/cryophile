@@ -9,8 +9,9 @@
 
 use std::{
     cmp::{Ordering, Reverse},
-    collections::BinaryHeap,
+    collections::{BTreeSet, BinaryHeap},
     fmt, io,
+    ops::{Range, RangeBounds},
     path::PathBuf,
 };
 
@@ -69,6 +70,10 @@ impl Fragment {
 
     pub fn is_zero(&self) -> bool {
         self.priority.0 == 0
+    }
+
+    pub fn index(&self) -> i32 {
+        self.priority.0
     }
 }
 
@@ -140,5 +145,238 @@ impl FragmentQueue {
         } else {
             Ok(false)
         }
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct Interval {
+    pub start: i32,
+    pub end: i32,
+}
+
+impl Interval {
+    pub fn new(start: i32, end: i32) -> Self {
+        if end < start {
+            Self {
+                start: end,
+                end: start,
+            }
+        } else {
+            Self { start, end }
+        }
+    }
+
+    pub fn point(p: i32) -> Self {
+        Self { start: p, end: p }
+    }
+
+    pub fn from_range(r: Range<i32>) -> Self {
+        Interval::new(r.start, r.end - 1)
+    }
+
+    pub fn envelope(&self, left: &Interval, right: &Interval) -> Self {
+        Interval::new(self.start.min(left.start), self.end.max(right.end))
+    }
+}
+
+impl fmt::Debug for Interval {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "[")?;
+        self.start.fmt(fmt)?;
+        write!(fmt, "..")?;
+        self.end.fmt(fmt)?;
+        write!(fmt, "]")?;
+        Ok(())
+    }
+}
+
+impl RangeBounds<i32> for Interval {
+    fn start_bound(&self) -> std::ops::Bound<&i32> {
+        std::ops::Bound::Included(&self.start)
+    }
+
+    fn end_bound(&self) -> std::ops::Bound<&i32> {
+        std::ops::Bound::Included(&self.end)
+    }
+}
+
+impl Ord for Interval {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // self.start <= self.end && other.start <= other.end
+        if self.contains(&other.start) && self.contains(&other.end) {
+            // self.start <= other.start && other.end <= self.end
+            Ordering::Equal
+        } else if other.end < self.start {
+            Ordering::Less
+        } else if self.end < other.start {
+            Ordering::Greater
+        } else {
+            // other.start < self.start && self.end < other.end
+            Ordering::Equal
+        }
+    }
+}
+
+impl PartialOrd for Interval {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct IntervalSet {
+    intervals: BTreeSet<Interval>,
+}
+
+impl fmt::Debug for IntervalSet {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "{{")?;
+        self.intervals.fmt(fmt)?;
+        write!(fmt, "}}")?;
+        Ok(())
+    }
+}
+
+impl IntervalSet {
+    pub fn new() -> Self {
+        Self {
+            intervals: BTreeSet::<Interval>::new(),
+        }
+    }
+
+    pub fn insert(&mut self, interval: Interval) {
+        let left_interval = Interval::point(interval.start - 1);
+        let right_interval = Interval::point(interval.end + 1);
+        let left = self.intervals.get(&left_interval);
+        let right = self.intervals.get(&right_interval);
+
+        let interval = if let (Some(l), Some(r)) = (left, right) {
+            let new_interval = interval.envelope(l, r);
+            self.intervals.remove(&left_interval);
+            self.intervals.remove(&right_interval);
+            new_interval
+        } else if let Some(l) = left {
+            let new_interval = interval.envelope(l, l);
+            self.intervals.remove(&left_interval);
+            new_interval
+        } else if let Some(r) = right {
+            let new_interval = interval.envelope(r, r);
+            self.intervals.remove(&right_interval);
+            new_interval
+        } else {
+            interval
+        };
+        let inserted = self.intervals.insert(interval);
+        assert!(inserted);
+    }
+
+    pub fn get(&self, value: &Interval) -> Option<&Interval> {
+        self.intervals.get(value)
+    }
+
+    pub fn first(&self) -> Option<&Interval> {
+        self.intervals.first()
+    }
+
+    pub fn last(&self) -> Option<&Interval> {
+        self.intervals.last()
+    }
+
+    pub fn len(&self) -> usize {
+        self.intervals.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.intervals.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_interval_set() {
+        let mut intervals = IntervalSet::new();
+
+        // {[1..1]}
+        intervals.insert(Interval::point(1));
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals.last(), Some(Interval::point(1)).as_ref());
+        assert_eq!(intervals.first(), Some(Interval::point(1)).as_ref());
+
+        // {[1..1], [3..3]}
+        intervals.insert(Interval::point(3));
+        assert_eq!(intervals.len(), 2);
+        assert_eq!(intervals.last(), Some(Interval::point(1)).as_ref());
+        assert_eq!(intervals.first(), Some(Interval::point(3)).as_ref());
+
+        // {[1..1], [3..4]}
+        intervals.insert(Interval::point(4));
+        assert_eq!(intervals.len(), 2);
+        assert_eq!(intervals.last(), Some(Interval::point(1)).as_ref());
+        assert_eq!(intervals.first(), Some(Interval::new(3, 4)).as_ref());
+
+        // {[1..1], [3..4], [7..7]}
+        intervals.insert(Interval::point(7));
+        assert_eq!(intervals.len(), 3);
+        assert_eq!(intervals.last(), Some(Interval::point(1)).as_ref());
+        assert_eq!(intervals.first(), Some(Interval::point(7)).as_ref());
+
+        // {[1..1], [3..4], [6..7]}
+        intervals.insert(Interval::point(6));
+        assert_eq!(intervals.len(), 3);
+        assert_eq!(intervals.last(), Some(Interval::point(1)).as_ref());
+        assert_eq!(
+            intervals.get(&Interval::point(3)),
+            Some(Interval::new(3, 4)).as_ref()
+        );
+        assert_eq!(
+            intervals.get(&Interval::point(4)),
+            Some(Interval::new(3, 4)).as_ref()
+        );
+        assert_eq!(
+            intervals.get(&Interval::new(3, 4)),
+            Some(Interval::new(3, 4)).as_ref()
+        );
+        assert_eq!(
+            intervals.get(&Interval::new(4, 5)),
+            Some(Interval::new(3, 4)).as_ref()
+        );
+        assert_eq!(
+            intervals.get(&Interval::new(2, 3)),
+            Some(Interval::new(3, 4)).as_ref()
+        );
+        assert_eq!(
+            intervals.get(&Interval::new(2, 5)),
+            Some(Interval::new(3, 4)).as_ref()
+        );
+        assert_eq!(intervals.get(&Interval::point(2)), None);
+        assert_eq!(intervals.get(&Interval::point(5)), None);
+        assert_eq!(
+            intervals.get(&Interval::new(3, 6)),
+            Some(Interval::new(6, 7)).as_ref()
+        );
+        assert_eq!(
+            intervals.get(&Interval::new(4, 6)),
+            Some(Interval::new(6, 7)).as_ref()
+        );
+        assert_eq!(
+            intervals.get(&Interval::new(1, 7)),
+            Some(Interval::new(6, 7)).as_ref()
+        );
+        assert_eq!(intervals.first(), Some(Interval::new(6, 7)).as_ref());
+
+        // {[1..4], [6..7]}
+        intervals.insert(Interval::point(2));
+        assert_eq!(intervals.len(), 2);
+        assert_eq!(intervals.last(), Some(Interval::new(1, 4)).as_ref());
+        assert_eq!(intervals.first(), Some(Interval::new(6, 7)).as_ref());
+
+        // {[1..7]}
+        intervals.insert(Interval::point(5));
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals.last(), Some(Interval::new(1, 7)).as_ref());
+        assert_eq!(intervals.first(), Some(Interval::new(1, 7)).as_ref());
     }
 }
