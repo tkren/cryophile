@@ -1,6 +1,6 @@
 [package]
 name = "permafrust"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 authors = ["Thomas Krennwallner <tk@postsubmeta.net>"]
 description = "Backup and restore tool for remote off-site backups"
@@ -22,7 +22,7 @@ anyhow = { version = "~1.0.77", features = ["backtrace"] }
 aws-config = "~1.1.1"
 aws-sdk-s3 = "~1.11.0"
 aws-types = "~1.1.1"
-clap = { version = "~4.4.11", features = ["cargo", "derive"] }
+clap = { version = "~4.4.12", features = ["cargo", "derive"] }
 chrono = "~0.4.31"
 env_logger = "~0.10.1"
 futures = "~0.3.30"
@@ -48,7 +48,7 @@ walkdir = "~2.4.0"
 zstd = "~0.13.0"
 
 [dev-dependencies]
-tempfile = "~3.8.1"
+tempfile = "~3.9.0"
 
 [profile.release]
 strip = "debuginfo"
