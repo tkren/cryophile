@@ -818,6 +818,41 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
+name = "cryophile"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aws-config",
+ "aws-sdk-s3",
+ "aws-types",
+ "chrono",
+ "clap",
+ "env_logger",
+ "futures",
+ "log",
+ "lz4_flex",
+ "nix",
+ "notify",
+ "parse-size",
+ "regex",
+ "rpassword",
+ "sequoia-openpgp",
+ "serde",
+ "serde_derive",
+ "tempfile",
+ "thiserror",
+ "thread_io",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "ulid",
+ "uuid",
+ "walkdir",
+ "xdg",
+ "zstd",
+]
+
+[[package]]
 name = "crypto-bigint"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1793,41 +1828,6 @@ name = "percent-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
-
-[[package]]
-name = "permafrust"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "aws-config",
- "aws-sdk-s3",
- "aws-types",
- "chrono",
- "clap",
- "env_logger",
- "futures",
- "log",
- "lz4_flex",
- "nix",
- "notify",
- "parse-size",
- "regex",
- "rpassword",
- "sequoia-openpgp",
- "serde",
- "serde_derive",
- "tempfile",
- "thiserror",
- "thread_io",
- "toml",
- "tracing",
- "tracing-subscriber",
- "ulid",
- "uuid",
- "walkdir",
- "xdg",
- "zstd",
-]
 
 [[package]]
 name = "petgraph"

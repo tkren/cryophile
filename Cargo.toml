@@ -1,12 +1,12 @@
 [package]
-name = "permafrust"
+name = "cryophile"
 version = "0.0.0"
 edition = "2021"
 authors = ["Thomas Krennwallner <tk@postsubmeta.net>"]
 description = "Backup and restore tool for remote off-site backups"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/tkren/permafrust"
+repository = "https://github.com/tkren/cryophile"
 publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

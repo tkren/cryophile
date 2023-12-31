@@ -1,4 +1,4 @@
-// Copyright The Permafrust Authors.
+// Copyright The Cryophile Authors.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE> or
 // <http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -7,24 +7,20 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-use permafrust;
-use std::fs;
-use std::fs::File;
-use std::io;
-use std::io::IoSlice;
-use std::io::Read;
-use std::io::Write;
+use cryophile::core::Split;
+use std::fs::{self, File};
+use std::io::{self, IoSlice, Read, Write};
 use std::path::PathBuf;
-use tempfile;
+use tempfile::TempDir;
 
 #[test]
 fn test_split_write() {
-    let tmp_dir = tempfile::TempDir::new().unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
     let out_path = tmp_path.join("out");
     let _ = fs::create_dir(&out_path);
     println!("tmpdir {tmp_path:?}");
-    let mut splitter = permafrust::core::Split::new(&tmp_path, &out_path, "chunk", 3);
+    let mut splitter = Split::new(&tmp_path, &out_path, "chunk", 3);
 
     let mut s = String::from("0123456789abcdef");
 
@@ -57,7 +53,7 @@ fn test_split_write() {
         assert_eq!(buf, s);
         s = remainder;
 
-        std::fs::remove_file(path).expect_err("old chunk is still present");
+        fs::remove_file(path).expect_err("old chunk is still present");
     }
 
     s.clear();
@@ -76,12 +72,12 @@ fn test_split_write() {
 
 #[test]
 fn test_split_write_vectored() {
-    let tmp_dir = tempfile::TempDir::new().unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
     let out_path = tmp_path.join("out");
     let _ = fs::create_dir(&out_path);
     println!("tmpdir {tmp_path:?}");
-    let mut splitter = permafrust::core::Split::new(&tmp_path, &out_path, "chunk", 3);
+    let mut splitter = Split::new(&tmp_path, &out_path, "chunk", 3);
 
     let s = String::from("0123456789abcdef");
 
@@ -99,13 +95,13 @@ fn test_split_write_vectored() {
 
 #[test]
 fn test_copy_to_split() {
-    let tmp_dir = tempfile::TempDir::new().unwrap();
+    let tmp_dir = TempDir::new().unwrap();
     let tmp_path = PathBuf::from(tmp_dir.path());
     let out_path = tmp_path.join("out");
     let _ = fs::create_dir(&out_path);
     println!("tmpdir {tmp_path:?}");
 
-    let mut splitter = permafrust::core::Split::new(&tmp_path, &out_path, "chunk", 512);
+    let mut splitter = Split::new(&tmp_path, &out_path, "chunk", 512);
 
     let s = String::from("0123456789abcdef");
     let strings = s.repeat(1000);

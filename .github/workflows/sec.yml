@@ -1,4 +1,4 @@
-name: permafrust security
+name: security
 
 on:
   schedule:

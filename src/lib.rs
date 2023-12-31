@@ -1,4 +1,4 @@
-// Copyright The Permafrust Authors.
+// Copyright The Cryophile Authors.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE> or
 // <http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -68,19 +68,19 @@ pub fn base_directory_profile(_subcommand: &Command) -> Result<xdg::BaseDirector
 pub fn setup(debug: u8, quiet: bool) -> Result<(), CliError> {
     // setup logger using environment:
     // prioritize command-line args over environment variables, and quiet over debug
-    let env = env_logger::Env::new().write_style("PERMAFRUST_LOG_STYLE");
+    let env = env_logger::Env::new().write_style("CRYOPHILE_LOG_STYLE");
     let env = if quiet {
         env.filter_or("", "error")
     } else {
         match debug {
             1 => env.filter_or("", "debug"),
             (2..) => env.filter_or("", "trace"),
-            _ => env.filter_or("PERMAFRUST_LOG", "info"),
+            _ => env.filter_or("CRYOPHILE_LOG", "info"),
         }
     };
     if let Err(err) = Builder::new().parse_env(env).try_init() {
         let err: CliError = err.into();
-        eprintln!("Cannot initialize permafrust: {err}");
+        eprintln!("Cannot initialize cryophile: {err}");
         return Err(err);
     }
     Ok(())
@@ -126,7 +126,7 @@ pub fn run(cli: Cli) -> Result<CliResult, CliError> {
         ConfigFile::new(cli.config.as_path())?
     } else {
         // do not fail if we cannot read standard config locations, unless there is a config syntax error
-        let user_config_path = base_directories.get_config_file("permafrust.toml");
+        let user_config_path = base_directories.get_config_file("cryophile.toml");
         read_config(&user_config_path)?
     };
 
