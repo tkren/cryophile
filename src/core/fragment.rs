@@ -56,12 +56,7 @@ impl PartialEq for Fragment {
 
 impl Fragment {
     pub fn new(path: PathBuf) -> Option<Self> {
-        let Some(extension) = path.extension() else {
-            return None;
-        };
-        let Some(priority) = extension.to_str()?.parse::<i32>().ok() else {
-            return None;
-        };
+        let priority = path.extension()?.to_str()?.parse::<i32>().ok()?;
         Some(Self {
             priority: Reverse(priority),
             path,
