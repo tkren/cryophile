@@ -186,6 +186,20 @@ fn invalid_path_error(msg: String) -> io::Error {
 }
 
 impl SpoolPathComponents {
+    pub fn uri(&self) -> Option<String> {
+        // TODO we pretend that we always have an s3 bucket provider here
+        let mut uri = String::from("s3://");
+        let vault = self.vault.canonical_path().ok()?;
+        uri.push_str(vault.to_str()?);
+        uri.push('/');
+        let prefix = self.prefix.canonical_path().ok()?;
+        uri.push_str(prefix.to_str()?);
+        uri.push('/');
+        let id = self.id.canonical_path().ok()?;
+        uri.push_str(id.to_str()?);
+        Some(uri)
+    }
+
     pub fn to_queue_path(&self, queue: Queue) -> io::Result<PathBuf> {
         let mut path = PathBuf::new();
 
@@ -234,7 +248,7 @@ impl SpoolPathComponents {
     ) -> io::Result<PathBuf> {
         let dir_path = self.to_queue_path(queue)?;
         if create_dir != CreateDirectory::No {
-            log::info!("Creating directory {dir_path:?}");
+            log::trace!("Creating directory {dir_path:?}");
             // first mkdir the parent path, ignoring if it exists, and then perform
             // atomic creation of the final element in dir_path
             // https://rcrowley.org/2010/01/06/things-unix-can-do-atomically.html
