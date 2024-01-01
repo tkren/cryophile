@@ -119,6 +119,8 @@ impl PrivateKey for LocalPrivateKey {
             let keyid = self.key.keyid();
             let encrypted_key = self.key.secret_mut();
             if password.is_none() {
+                // TODO CRYOPHILE_ASKPASS
+                // TODO batch mode
                 let p: Password =
                     rpassword::prompt_password(format!("Enter password to decrypt key {keyid}: "))?
                         .into();
@@ -288,13 +290,11 @@ pub fn read_password_fd(fd: i32) -> Option<Password> {
     let mut reader = BufReader::new(file);
     rpassword::read_password_from_bufread(&mut reader)
         .map(Into::<Password>::into)
-        .map_or_else(
-            |err| {
-                log::warn!("Cannot read password from file descriptor {fd}: {err}");
-                None
-            },
-            Some,
-        )
+        .map_err(|err| {
+            log::warn!("Cannot read password from file descriptor {fd}: {err}");
+            err
+        })
+        .ok()
 }
 
 pub fn build_decryptor<'a, R: 'a + io::Read + Send + Sync>(
