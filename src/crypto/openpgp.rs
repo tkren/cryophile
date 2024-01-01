@@ -74,10 +74,10 @@ where
             let storage_cert = storage.cert().fingerprint();
             let subkey = storage.keyid();
             let mpis = storage.mpis();
-            let algo = mpis.algo().unwrap();
+            let algo = mpis.algo().expect("cannot handle unknown algorithm");
             let size = mpis.bits().unwrap_or(0);
             log::info!(
-                "Encrypting for certificate {storage_cert} subkey {subkey} algo {algo}{size}",
+                "Recipient certificate {storage_cert} subkey {subkey} algo {algo}{size}",
                 storage_cert = storage_cert.to_string(),
                 subkey = subkey.to_string(),
                 algo = algo.to_string(),
@@ -208,7 +208,7 @@ where
     R: IntoIterator,
     R::Item: Into<Recipient<'a>>,
 {
-    log::trace!(
+    log::info!(
         "Setting up encryption with {algo}…",
         algo = SymmetricAlgorithm::AES256
     );
