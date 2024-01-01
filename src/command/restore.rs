@@ -50,6 +50,8 @@ pub fn perform_restore(config: &Config, restore: &Restore) -> io::Result<()> {
     let handle = walk_or_watch_restore_dir(&spool_path_components, watch, fragment_queue)?;
 
     let policy = &StandardPolicy::new();
+    // TODO use optional CRYOPHILE_ASKPASS instead of terminal prompt
+    // TODO batch mode should not try to prompt for password at all
     let password = restore.pass_fd.and_then(read_password_fd);
     let secret_key_store = secret_key_store(policy, restore.keyring.iter().flatten(), password)?;
 
