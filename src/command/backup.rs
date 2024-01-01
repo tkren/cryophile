@@ -26,8 +26,6 @@ use std::path::{Path, PathBuf};
 // https://github.com/rust-lang/rust-clippy/issues/11631 breaks unwrap_or_else(Ulid::new)
 #[allow(clippy::unwrap_or_default)]
 pub fn perform_backup(config: &Config, backup: &Backup) -> io::Result<()> {
-    log::info!("BACKUP…");
-
     let spool_path_components = SpoolPathComponents::new(
         config.cli.spool.clone(),
         backup.vault,
@@ -81,7 +79,10 @@ pub fn perform_backup(config: &Config, backup: &Backup) -> io::Result<()> {
     let reader: Box<dyn io::Read> = build_reader(backup.input.as_ref())?;
     let mut buffered_reader = io::BufReader::new(reader);
 
-    log::trace!("Starting backup…");
+    let backup_uri = spool_path_components
+        .uri()
+        .expect("cannot create backup uri");
+    log::debug!("Starting backup {backup_uri}");
 
     let copy_result = match backup.compression {
         CompressionType::None => {
@@ -126,7 +127,10 @@ pub fn perform_backup(config: &Config, backup: &Backup) -> io::Result<()> {
     encryptor_sink.flush()?;
     encryptor_sink.finalize().map_err(openpgp_error)?;
     drop(splitter);
-    touch_zero_file(&backup_dir, &freeze_dir)
+    touch_zero_file(&backup_dir, &freeze_dir)?;
+
+    log::info!("Queued backup {backup_uri} for freeze {freeze_dir:?}");
+    Ok(())
 }
 
 fn touch_zero_file(incoming: &Path, outgoing: &Path) -> io::Result<()> {
