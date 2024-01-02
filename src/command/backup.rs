@@ -123,7 +123,7 @@ pub fn perform_backup(config: &Config, backup: &Backup) -> io::Result<()> {
         }
     };
 
-    log::trace!("Wrote total of {copy_result} bytes");
+    log::debug!("Wrote total of {copy_result} bytes");
     encryptor_sink.flush()?;
     encryptor_sink.finalize().map_err(openpgp_error)?;
     drop(splitter);
