@@ -118,7 +118,11 @@ pub fn read_config(path: &Path) -> Result<ConfigFile, CliError> {
 pub fn run(cli: Cli) -> Result<CliResult, CliError> {
     log_versions();
 
-    let base_directories = base_directory_profile(&cli.command).unwrap();
+    let base_directories = base_directory_profile(&cli.command)?;
+
+    // setup base directory
+    let config_home_path: PathBuf = core::path::use_base_dir(&base_directories)?;
+    log::debug!("Using config home directory {config_home_path:?}");
 
     // read config file
     let config_file = if cli.config != PathBuf::from(DEFAULT_CONFIG_PATH) {
@@ -132,13 +136,9 @@ pub fn run(cli: Cli) -> Result<CliResult, CliError> {
 
     let config = Config::new(base_directories, cli, config_file);
 
-    // setup base directory
-    let base_pathbuf: PathBuf = core::path::use_base_dir(&config.base)?;
-    log::trace!("Using base state directory {base_pathbuf:?}");
-
     let spool = &config.cli.spool;
     fs::read_dir(spool)?; // PermissionDenied, NotADirectory, NotFound, etc.
-    log::trace!("Using spool directory {spool:?}");
+    log::debug!("Using spool directory {spool:?}");
 
     // perform requested command
     match &config.cli.command {
