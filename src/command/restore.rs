@@ -22,6 +22,7 @@ use crate::Config;
 use notify::event::CreateKind;
 use notify::{EventKind, RecursiveMode, Watcher};
 use sequoia_openpgp::policy::StandardPolicy;
+use std::convert;
 use std::os::unix::prelude::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::thread::JoinHandle;
@@ -45,9 +46,21 @@ pub fn perform_restore(config: &Config, restore: &Restore) -> io::Result<()> {
 
     let watch = Box::new(Watch::new()?);
 
+    let (freeze_dir, created) =
+        spool_path_components.try_with_queue_path(Queue::Freeze, CreateDirectory::Recursive)?;
+
     // Create and watch restore directory, or use restore directory from a previous run.
     // No need to watch once we could fully walked the downloaded restore directory (e.g., if restore was interrupted).
-    let handle = walk_or_watch_restore_dir(&spool_path_components, watch, fragment_queue)?;
+    let handle = if created {
+        Some(watch_restore_dir(&freeze_dir, watch, fragment_queue)?)
+    } else {
+        walk_and_watch_restore_dir(&freeze_dir, watch, fragment_queue)?
+    };
+
+    let restore_uri = spool_path_components
+        .uri()
+        .expect("cannot create restore uri");
+    log::debug!("Starting restore of {restore_uri}");
 
     let policy = &StandardPolicy::new();
     // TODO use optional CRYOPHILE_ASKPASS instead of terminal prompt
@@ -62,11 +75,15 @@ pub fn perform_restore(config: &Config, restore: &Restore) -> io::Result<()> {
         restore.compression,
         output,
     )?;
-    log::info!("Received total of {copy_result} bytes");
+    log::debug!("Received total of {copy_result} bytes");
 
     handle
         .map(|h| h.join().expect("could not join thread"))
-        .unwrap_or(Ok(()))
+        .map_or_else(|| Ok(()), convert::identity)
+        .map(|x| {
+            log::info!("Restored backup {restore_uri} from restore queue {freeze_dir:?}");
+            x
+        })
 }
 
 fn build_writer(path: Option<&PathBuf>) -> io::Result<Box<dyn io::Write>> {
@@ -93,32 +110,13 @@ fn build_writer(path: Option<&PathBuf>) -> io::Result<Box<dyn io::Write>> {
     Ok(writer)
 }
 
-fn walk_or_watch_restore_dir(
-    spool_path_components: &SpoolPathComponents,
+fn walk_and_watch_restore_dir(
+    path: &Path,
     watch: Box<Watch>,
     mut queue: FragmentQueue,
 ) -> io::Result<Option<JoinHandle<io::Result<()>>>> {
-    let path =
-        match spool_path_components.with_queue_path(Queue::Restore, CreateDirectory::Recursive) {
-            Ok(path) => {
-                // we could create path, now watch for incoming files
-                let handle = watch_restore_dir(path.as_path(), watch, queue)?;
-                return Ok(Some(handle));
-            }
-            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
-                let path = spool_path_components.to_queue_path(Queue::Restore)?;
-                if !path.is_dir() {
-                    return Err(err); // a non-directory is in the way, just bail out
-                }
-                path // reuse directory and walk
-            }
-            Err(err) => {
-                return Err(err);
-            }
-        };
-
     // enter path, only retrieving direct children
-    let walk = WalkDir::new(path.as_path())
+    let walk = WalkDir::new(path)
         .follow_root_links(false)
         .min_depth(1)
         .max_depth(1);
@@ -148,7 +146,7 @@ fn walk_or_watch_restore_dir(
     if queue.send_zero_maybe()? {
         Ok(None)
     } else {
-        let handle = watch_restore_dir(path.as_path(), watch, queue)?;
+        let handle = watch_restore_dir(path, watch, queue)?;
         Ok(Some(handle))
     }
 }
@@ -158,7 +156,7 @@ fn watch_restore_dir(
     mut watch: Box<Watch>,
     queue: FragmentQueue,
 ) -> io::Result<JoinHandle<io::Result<()>>> {
-    log::trace!("Watching {path:?}");
+    log::debug!("Monitoring restore queue at {path:?}");
     watch
         .watcher
         .watch(path, RecursiveMode::NonRecursive)
