@@ -278,27 +278,44 @@ impl SpoolPathComponents {
         }
         Ok(dir_path)
     }
+
+    pub(crate) fn try_with_queue_path(
+        &self,
+        queue: Queue,
+        create_dir: CreateDirectory,
+    ) -> io::Result<(PathBuf, bool)> {
+        let (path, created) = match self.with_queue_path(queue, create_dir) {
+            Ok(path) => {
+                // we could create path, now watch for incoming files
+                (path, true)
+            }
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {
+                let path = self.to_queue_path(queue)?;
+                if !path.is_dir() {
+                    return Err(err); // a non-directory is in the way, just bail out
+                }
+                (path, false) // reuse directory and walk
+            }
+            Err(err) => {
+                return Err(err);
+            }
+        };
+        Ok((path, created))
+    }
 }
 
 pub(crate) fn use_base_dir(base: &xdg::BaseDirectories) -> io::Result<PathBuf> {
-    let state_home = base.get_state_home();
-    match fs::metadata(&state_home) {
-        Err(_err) => {
-            log::info!("Creating state directory {state_home:?}");
-            match base.create_state_directory("") {
-                Ok(state_path) => Ok(state_path),
-                Err(err) => Err(err),
-            }
+    let config_home = base.get_config_home();
+    match fs::metadata(&config_home) {
+        Err(_) => {
+            log::debug!("Creating config home {config_home:?}");
+            base.create_config_directory("")
         }
-        Ok(metadata) => {
-            if !metadata.is_dir() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Base state home {state_home:?} is not an existing directory"),
-                ));
-            }
-            Ok(state_home)
-        }
+        Ok(metadata) if !metadata.is_dir() => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Config home {config_home:?} is not an existing directory"),
+        )),
+        Ok(_) => Ok(config_home),
     }
 }
 
