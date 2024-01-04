@@ -7,148 +7,35 @@
 // This file may not be copied, modified, or distributed except according
 // to those terms.
 
-use std::{
-    fs, io,
-    os::unix::fs::DirBuilderExt,
-    path::{Component, PathBuf},
-};
+use std::{fs, io, os::unix::fs::DirBuilderExt, path::PathBuf};
 
-use chrono::{DateTime, Utc};
-use nix::NixPath;
-use ulid::Ulid;
-use uuid::Uuid;
+use super::backup_id::BackupId;
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub enum SpoolNameComponent {
-    #[default]
-    None,
-    Vault(Uuid),
-    Prefix(Option<PathBuf>),
-    Id(Ulid),
-}
-
-impl SpoolNameComponent {
-    pub fn canonical_path(&self) -> io::Result<PathBuf> {
-        let dir = match self {
-            SpoolNameComponent::None => {
-                return Err(invalid_path_error(
-                    "cannot build unassigned spool name component".to_string(),
-                ))
-            }
-            SpoolNameComponent::Vault(vault) => PathBuf::from(vault.to_string()),
-            SpoolNameComponent::Id(ulid) => PathBuf::from(ulid.to_string()),
-            SpoolNameComponent::Prefix(prefix) => {
-                let prefix = validate_prefix(prefix)?;
-                // here we only care about relative paths, needs validate_prefix first
-                let mut canonical_dir_path = PathBuf::new();
-                // create canonical representation
-                for component in prefix.components() {
-                    match component {
-                        Component::Normal(subpath) => {
-                            canonical_dir_path.push(subpath);
-                        }
-                        Component::CurDir => {
-                            // ignore paths that start with ./ (other CurDir are already normalized)
-                        }
-                        _ => {
-                            // ParentDir and RootDir and Prefix are disallowed
-                            return Err(invalid_path_error(format!(
-                                "Path {prefix:?} must not contain a .. component"
-                            )));
-                        }
-                    }
-                }
-                canonical_dir_path
-            }
-        };
-        log::trace!("Using {self:?} directory {dir:?}");
-        Ok(dir)
-    }
-}
-
-fn validate_prefix(prefix: &Option<PathBuf>) -> io::Result<PathBuf> {
-    let prefix = if let Some(pfx) = prefix {
-        if pfx.is_empty() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "prefix cannot be empty".to_string(),
-            ));
-        }
-        // TODO check if prefix is safe
-        if pfx.has_root() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "prefix cannot have a root component or be absolute".to_string(),
-            ));
-        }
-        pfx.to_owned()
-    } else {
-        // only undefined prefixes can be empty
-        PathBuf::new()
-    };
-    Ok(prefix)
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct SpoolPathComponents {
+#[derive(Clone, Debug)]
+pub struct SpoolPathComponents<'a> {
     pub spool: PathBuf,
-    pub vault: SpoolNameComponent,
-    pub prefix: SpoolNameComponent,
-    pub id: SpoolNameComponent,
+    pub backup_id: Option<BackupId<'a>>,
 }
 
-impl SpoolPathComponents {
-    pub fn new(spool: PathBuf, vault: Uuid, prefix: Option<PathBuf>, id: Ulid) -> Self {
+impl<'a> SpoolPathComponents<'a> {
+    pub fn new(spool: PathBuf, backup_id: BackupId<'a>) -> Self {
         Self {
             spool,
-            vault: SpoolNameComponent::Vault(vault),
-            prefix: SpoolNameComponent::Prefix(prefix),
-            id: SpoolNameComponent::Id(id),
-        }
-    }
-
-    pub fn from_prefix(spool: PathBuf, vault: Uuid, prefix: PathBuf) -> Self {
-        Self {
-            spool,
-            vault: SpoolNameComponent::Vault(vault),
-            prefix: SpoolNameComponent::Prefix(Some(prefix)),
-            id: SpoolNameComponent::None,
+            backup_id: Some(backup_id),
         }
     }
 
     pub fn from_spool(spool: PathBuf) -> Self {
         Self {
             spool,
-            vault: SpoolNameComponent::None,
-            prefix: SpoolNameComponent::None,
-            id: SpoolNameComponent::None,
+            backup_id: None,
         }
     }
 
-    pub fn with_vault(self, vault: Uuid) -> Self {
+    pub fn with_backup_id(self, backup_id: BackupId<'a>) -> Self {
         Self {
             spool: self.spool,
-            vault: SpoolNameComponent::Vault(vault),
-            prefix: self.prefix,
-            id: self.id,
-        }
-    }
-
-    pub fn with_prefix(self, prefix: PathBuf) -> Self {
-        Self {
-            spool: self.spool,
-            vault: self.vault,
-            prefix: SpoolNameComponent::Prefix(Some(prefix)),
-            id: self.id,
-        }
-    }
-
-    pub fn with_id(self, id: Ulid) -> Self {
-        Self {
-            spool: self.spool,
-            vault: self.vault,
-            prefix: self.prefix,
-            id: SpoolNameComponent::Id(id),
+            backup_id: Some(backup_id),
         }
     }
 }
@@ -181,22 +68,11 @@ pub(crate) enum CreateDirectory {
     Recursive,
 }
 
-fn invalid_path_error(msg: String) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidInput, msg)
-}
-
-impl SpoolPathComponents {
+impl<'a> SpoolPathComponents<'a> {
     pub fn uri(&self) -> Option<String> {
         // TODO we pretend that we always have an s3 bucket provider here
         let mut uri = String::from("s3://");
-        let vault = self.vault.canonical_path().ok()?;
-        uri.push_str(vault.to_str()?);
-        uri.push('/');
-        let prefix = self.prefix.canonical_path().ok()?;
-        uri.push_str(prefix.to_str()?);
-        uri.push('/');
-        let id = self.id.canonical_path().ok()?;
-        uri.push_str(id.to_str()?);
+        uri.push_str(&self.backup_id?.to_string());
         Some(uri)
     }
 
@@ -211,31 +87,8 @@ impl SpoolPathComponents {
 
         log::trace!("Base directory for {queue:?} queue: {path:?}");
 
-        // next we add a vault as lower-case hyphenated UUID
-        if self.vault == SpoolNameComponent::None {
-            return Ok(path);
-        };
-        let vault_dir = self.vault.canonical_path()?;
-        path.push(vault_dir);
-
-        // then the prefix key, potentially containing a path of length >= 1
-        let prefix_dir = self.prefix.canonical_path()?;
-        path.push(prefix_dir);
-
-        // finally, the current ULID path (timestamp + random) if available
-        match self.id {
-            SpoolNameComponent::None => return Ok(path),
-            SpoolNameComponent::Id(id) => {
-                log::trace!(
-                    "Using ULID with timestamp={ulid_timestamp:?} and random={ulid_random:x?}",
-                    ulid_timestamp = DateTime::<Utc>::from(id.datetime()),
-                    ulid_random = id.random(),
-                );
-
-                let ulid_dir = self.id.canonical_path()?;
-                path.push(ulid_dir);
-            }
-            _ => panic!("id must be SpoolNameComponent::Id or SpoolNameComponent::None"),
+        if let Some(backup_id) = self.backup_id {
+            path.push(backup_id.to_path_buf());
         };
 
         Ok(path)
@@ -327,12 +180,8 @@ mod tests {
 
     #[test]
     fn basic_spool_path_components() {
-        let snc = SpoolPathComponents::new(
-            PathBuf::from("/"),
-            uuid::Uuid::nil(),
-            None,
-            ulid::Ulid::nil(),
-        );
+        let backup_id = BackupId::new(uuid::Uuid::nil(), None, ulid::Ulid::nil());
+        let snc = SpoolPathComponents::new(PathBuf::from("/"), backup_id);
         let queue_path = snc
             .to_queue_path(Queue::Backup)
             .expect("this shouldn't fail");
@@ -343,8 +192,10 @@ mod tests {
             )
         );
 
+        let prefix = String::from("some/prefix");
+        let backup_id = backup_id.with_prefix(&prefix);
         let queue_path = snc
-            .with_prefix(PathBuf::from("some/prefix"))
+            .with_backup_id(backup_id)
             .to_queue_path(Queue::Restore)
             .expect("this shouldn't fail");
         assert_eq!(
