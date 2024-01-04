@@ -8,6 +8,7 @@
 // to those terms.
 
 pub mod aws;
+pub mod backup_id;
 pub mod cat;
 pub mod constants;
 pub mod fragment;
