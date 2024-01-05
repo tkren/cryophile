@@ -10,6 +10,7 @@
 use crate::cli::Restore;
 use crate::compression::decompressor::Decompressor;
 use crate::compression::CompressionType;
+use crate::core::backup_id::BackupId;
 use crate::core::cat::Cat;
 use crate::core::fragment::FragmentQueue;
 use crate::core::notify::notify_error;
@@ -34,12 +35,10 @@ pub fn perform_restore(config: &Config, restore: &Restore) -> io::Result<()> {
 
     let output: Box<dyn io::Write> = build_writer(restore.output.as_ref())?;
 
-    let spool_path_components = SpoolPathComponents::new(
-        config.cli.spool.clone(),
-        restore.vault,
-        restore.prefix.clone(),
-        restore.ulid,
-    );
+    let prefix_str_maybe = restore.prefix.as_ref().and_then(|path| path.to_str());
+    let backup_id = BackupId::new(restore.vault, prefix_str_maybe, restore.ulid);
+
+    let spool_path_components = SpoolPathComponents::new(config.cli.spool.clone(), backup_id);
 
     let concat = Cat::new();
     let fragment_queue = FragmentQueue::new(concat.tx());

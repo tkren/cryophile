@@ -9,6 +9,7 @@
 
 use crate::cli::Backup;
 use crate::compression::CompressionType;
+use crate::core::backup_id::BackupId;
 use crate::core::constants::{CHUNK_FILE_MODE, CHUNK_FILE_PREFIX, DEFAULT_BUF_SIZE};
 use crate::core::path::{CreateDirectory, Queue, SpoolPathComponents};
 use crate::core::Split;
@@ -26,12 +27,14 @@ use std::path::{Path, PathBuf};
 // https://github.com/rust-lang/rust-clippy/issues/11631 breaks unwrap_or_else(Ulid::new)
 #[allow(clippy::unwrap_or_default)]
 pub fn perform_backup(config: &Config, backup: &Backup) -> io::Result<()> {
-    let spool_path_components = SpoolPathComponents::new(
-        config.cli.spool.clone(),
+    let prefix_str_maybe = backup.prefix.as_ref().and_then(|path| path.to_str());
+    let backup_id = BackupId::new(
         backup.vault,
-        backup.prefix.clone(),
+        prefix_str_maybe,
         backup.ulid.or(backup.timestamp).unwrap_or_else(Ulid::new),
     );
+
+    let spool_path_components = SpoolPathComponents::new(config.cli.spool.clone(), backup_id);
     let backup_dir =
         spool_path_components.with_queue_path(Queue::Backup, CreateDirectory::Recursive)?;
     let freeze_dir =
@@ -41,7 +44,7 @@ pub fn perform_backup(config: &Config, backup: &Backup) -> io::Result<()> {
     {
         let mut recipients: Vec<Box<dyn age::Recipient>> = vec![];
         if backup.recipient.is_some() {
-            for recipient in backup.recipient.as_ref().unwrap() {
+            for recipient in backup.recipient.as_ref().expect("no recipient") {
                 recipients.push(recipient.get_recipient());
             }
         }
