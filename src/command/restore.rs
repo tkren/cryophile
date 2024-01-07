@@ -43,7 +43,7 @@ pub fn perform_restore(config: &Config, restore: &Restore) -> io::Result<()> {
     let concat = Cat::new();
     let fragment_queue = FragmentQueue::new(concat.tx());
 
-    let watch = Box::new(Watch::new()?);
+    let watch = Box::new(Watch::new(None)?);
 
     let (freeze_dir, created) =
         spool_path_components.try_with_queue_path(Queue::Freeze, CreateDirectory::Recursive)?;
