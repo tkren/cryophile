@@ -111,7 +111,7 @@ compression = "Lz4"
                 name: "the-bucket-name".to_owned(),
             }),
         };
-        assert_eq!(vaults.next().expect(""), &v0);
+        assert_eq!(vaults.next().expect("1st vault missing"), &v0);
 
         let v1 = Vault {
             id: uuid::Uuid::from_str("23e52b86-7293-4889-824f-50135685c9e4").unwrap(),
@@ -121,7 +121,7 @@ compression = "Lz4"
             compression: Some(CompressionType::Lz4),
             bucket: None,
         };
-        assert_eq!(vaults.next().expect(""), &v1);
+        assert_eq!(vaults.next().expect("2nd vault missing"), &v1);
 
         assert_eq!(vaults.next(), None);
     }
