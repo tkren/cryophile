@@ -125,7 +125,7 @@ impl io::Read for Cat {
                 total_bytes = self.tot,
                 chunks = self.num
             );
-            let rx = self.rx.lock().unwrap();
+            let rx = self.rx.lock().expect("Cannot lock cat receiver");
             rx.recv().map_err(channel_recv_error)?
         };
         if let Some(path) = opt_path {

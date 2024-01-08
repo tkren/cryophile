@@ -18,7 +18,10 @@ pub async fn aws_config(region: Option<String>) -> SdkConfig {
         .or_else(Region::new("ca-central-1"));
 
     if log_enabled!(log::Level::Trace) {
-        let region = region_provider.region().await.unwrap();
+        let region = region_provider
+            .region()
+            .await
+            .expect("Region provider missing");
         log::trace!("Using S3 region {region}")
     }
 
