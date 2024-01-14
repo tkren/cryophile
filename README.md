@@ -187,6 +187,71 @@ cryophile backup --vault VAULT --prefix PREFIX \
           --input /path/to/cryophile.fifo
 ```
 
+### Create full zfs backup stream
+
+```shell
+zfs list -H -t snapshot -s creation -o name mypool/fs/dataset
+```
+
+```shell
+zfs send --verbose --replicate --raw --large-block --compressed mypool/fs/dataset@SNAPSHOT \
+    | cryophile backup --keyring KEYRING --vault VAULT --prefix PREFIX --timestamp TIMESTAMP
+```
+
+```shell
+cryophile restore --keyring KEYRING --vault VAULT --prefix PREFIX --timestamp TIMESTAMP \
+    | zfs receive -vu otherpool/backup/dataset
+```
+
+### Create incremental zfs backup stream
+
+```shell
+zfs snapshot mypool/fs/dataset@$(date -u +%Y%m%dT%H%M%SZ)
+```
+
+```shell
+zfs list -H -t snapshot -s creation -o name mypool/fs/dataset | sed -n 'FIRSTp;LASTp'
+```
+
+```shell
+zfs list -H -t snapshot -s creation -o name mypool/fs/dataset | sed -n '1p;$p'
+```
+
+```shell
+zfs send --verbose --replicate --raw --large-block --compressed -i mypool/fs/dataset@SNAP1 mypool/fs/set@SNAP2 \
+    | cryophile backup --keyring KEYRING --vault VAULT --prefix PREFIX --timestamp TIMESTAMP
+```
+
+```shell
+zfs send --verbose --replicate --raw --large-block --compressed -I mypool/fs/dataset@SNAP1 mypool/fs/set@SNAPk
+```
+
+```shell
+cryophile restore --keyring KEYRING --vault VAULT --prefix PREFIX --timestamp TIMESTAMP \
+    | zfs receive -vu otherpool/backup/dataset
+```
+
+### Create (incremental) btrfs backup stream
+
+```shell
+btrfs subvolume snapshot -r /data /backup/mysnapshot
+```
+
+```shell
+btrfs send --compressed-data /backup/mysnapshot \
+    | cryophile backup --keyring KEYRING --vault VAULT --prefix PREFIX --timestamp TIMESTAMP
+```
+
+```shell
+btrfs send --compressed-data -p /backups/mysnapshot-1 /backups/mysnapshot-2 \
+    | cryophile backup --keyring KEYRING --vault VAULT --prefix PREFIX --timestamp TIMESTAMP
+```
+
+```shell
+cryophile restore --keyring KEYRING --vault VAULT --prefix PREFIX --timestamp TIMESTAMP \
+    | btrfs receive /restore/mysnapshot
+```
+
 ## Generate encryption key and certificate
 
 ### Using sequoia-sq
