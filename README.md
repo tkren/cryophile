@@ -7,6 +7,12 @@
 ![build](https://github.com/tkren/cryophile/actions/workflows/build.yml/badge.svg)
 ![sec](https://github.com/tkren/cryophile/actions/workflows/sec.yml/badge.svg)
 
+## 🚨 Cryophile is currently work in progress and incomplete
+
+Stand by while we implement the missing bits and pieces.
+
+---
+
 <figure>
   <img
   src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Echiniscus_insularis_%2810.3897-evolsyst.5.59997%29_Figure_6_%28white_background%29.jpg/256px-Echiniscus_insularis_%2810.3897-evolsyst.5.59997%29_Figure_6_%28white_background%29.jpg"
