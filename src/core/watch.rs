@@ -9,10 +9,11 @@
 
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::io;
-use std::sync::mpsc::{Receiver, RecvError, SendError};
-use std::sync::{mpsc, Mutex};
+use std::sync::mpsc::{RecvError, SendError};
+use std::sync::Mutex;
 use tempfile::TempDir;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use super::fragment::Fragment;
 use super::notify::notify_error;
@@ -44,7 +45,7 @@ impl Watch {
     pub fn new(handler: Option<Sender<Option<Fragment>>>) -> io::Result<Self> {
         // here we can shutdown the watch
         let shutdown = tempfile::tempdir()?;
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel(10);
         let mut watcher = RecommendedWatcher::new(
             move |res| {
                 futures::executor::block_on(async {
