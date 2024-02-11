@@ -28,10 +28,16 @@ use std::os::unix::prelude::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::thread::JoinHandle;
 use std::{fs, io, thread};
+use tokio::runtime::Builder;
 use walkdir::WalkDir;
 
 pub fn perform_restore(config: &Config, restore: &Restore) -> io::Result<()> {
     log::info!("RESTORE…");
+
+    let runtime = Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()?;
 
     let output: Box<dyn io::Write> = build_writer(restore.output.as_ref())?;
 
@@ -164,10 +170,10 @@ fn watch_restore_dir(
     Ok(handle)
 }
 
-fn notify_event_worker(watch: &Watch, mut queue: FragmentQueue) -> io::Result<()> {
+async fn notify_event_worker(watch: &Watch, mut queue: FragmentQueue) -> io::Result<()> {
     log::trace!("Starting notify_event_worker…");
-    let notify_receiver = watch.rx.lock().expect("Cannot lock watch receiver");
-    for event in notify_receiver.iter() {
+    let mut notify_receiver = watch.rx.lock().expect("Cannot lock watch receiver");
+    while let Some(event) = notify_receiver.recv().await {
         match event.map_err(notify_error)? {
             notify::Event {
                 kind: EventKind::Create(CreateKind::File),
