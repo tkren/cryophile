@@ -15,6 +15,7 @@ use crate::core::notify::notify_error;
 use crate::core::path::{CreateDirectory, Queue, SpoolPathComponents};
 use crate::core::watch::Watch;
 use crate::Config;
+use futures::FutureExt;
 use notify::{event::CreateKind, EventKind, RecursiveMode, Watcher};
 use std::path::{Path, PathBuf};
 use std::thread::{self, JoinHandle};
