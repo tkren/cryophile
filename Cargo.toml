@@ -2,6 +2,7 @@
 name = "cryophile"
 version = "0.0.0"
 edition = "2021"
+rust-version = "1.81"  # MSRV
 authors = ["Thomas Krennwallner <tk@postsubmeta.net>"]
 description = "Backup and restore tool for remote off-site backups"
 license = "MIT OR Apache-2.0"
