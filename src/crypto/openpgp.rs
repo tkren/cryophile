@@ -301,10 +301,7 @@ pub fn build_decryptor<'a, R: 'a + io::Read + Send + Sync>(
     secret_key_store: SecretKeyStore,
     policy: &'a dyn Policy,
     input: R,
-) -> openpgp::Result<stream::Decryptor<'a, SecretKeyStore>>
-where
-    R: io::Read + 'a + Send + Sync,
-{
+) -> openpgp::Result<stream::Decryptor<'a, SecretKeyStore>> {
     log::trace!("Setting up decryption…");
     let decryptor = DecryptorBuilder::from_reader(input)?
         .buffer_size(DEFAULT_BUF_SIZE) // we do not verify, no need for a larger buffer
