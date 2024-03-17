@@ -31,10 +31,7 @@ impl<'a> Decompressor<'a> {
         }
     }
 
-    fn magic_decompressor<W: ?Sized>(mut self, writer: &mut W) -> io::Result<u64>
-    where
-        W: io::Write,
-    {
+    fn magic_decompressor<W: io::Write + ?Sized>(mut self, writer: &mut W) -> io::Result<u64> {
         // read 4 byte magic header and guess compression algorithm
         let mut magic = [0u8; 4];
         let mut buf: &mut [u8] = &mut magic;
@@ -82,10 +79,7 @@ impl<'a> Decompressor<'a> {
         io::copy(&mut decompressor, writer)
     }
 
-    pub fn copy_to<W: ?Sized>(self, writer: &mut W) -> io::Result<u64>
-    where
-        W: io::Write,
-    {
+    pub fn copy_to<W: io::Write + ?Sized>(self, writer: &mut W) -> io::Result<u64> {
         if let Some(compression_type) = self.compression {
             let mut decompressor = match compression_type {
                 CompressionType::None => {
