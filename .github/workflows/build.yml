@@ -32,7 +32,7 @@ jobs:
         run: cargo clippy -- -D warnings
 
   msrv:
-    Name: Minimum Supported Rust Version
+    name: Minimum Supported Rust Version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
