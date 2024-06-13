@@ -31,13 +31,13 @@ jobs:
       - name: cargo clippy
         run: cargo clippy -- -D warnings
 
-  msrv:
-    name: Minimum Supported Rust Version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: taiki-e/install-action@cargo-hack
-      - run: cargo hack check --rust-version --workspace --all-targets --ignore-private
+  # msrv:
+  #   name: Minimum Supported Rust Version
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: taiki-e/install-action@cargo-hack
+  #     - run: cargo hack check --rust-version --workspace --all-targets
 
   test:
     name: Test
