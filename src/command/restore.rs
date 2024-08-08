@@ -79,9 +79,8 @@ pub fn perform_restore(config: &Config, restore: &Restore) -> io::Result<()> {
     handle
         .map(|h| h.join().expect("could not join thread"))
         .map_or_else(|| Ok(()), convert::identity)
-        .map(|x| {
+        .inspect(|_x| {
             log::info!("Restored backup {restore_uri} from restore queue {freeze_dir:?}");
-            x
         })
 }
 
