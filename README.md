@@ -3,7 +3,7 @@
 [![cryophile crate](https://img.shields.io/crates/v/cryophile.svg)](https://crates.io/crates/cryophile)
 [![cryophile documentation](https://docs.rs/cryophile/badge.svg)](https://docs.rs/cryophile)
 [![license badge](https://img.shields.io/badge/License-Apache--2.0_OR_MIT-green?logo=spdx)](https://github.com/tkren/cryophile/blob/main/COPYRIGHT)
-![MSRV 1.81](https://img.shields.io/badge/MSRV-1.81-yellow?logo=rust)
+![MSRV 1.82](https://img.shields.io/badge/MSRV-1.82-yellow?logo=rust)
 ![build](https://github.com/tkren/cryophile/actions/workflows/build.yml/badge.svg)
 ![sec](https://github.com/tkren/cryophile/actions/workflows/sec.yml/badge.svg)
 
