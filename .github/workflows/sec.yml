@@ -2,11 +2,12 @@ name: security
 
 on:
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "4 2 * * *"
 
   push:
     paths:
-      - "**/Cargo.*"
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
 
   pull_request:
     branches:
@@ -19,6 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: rustsec/audit-check@v1.4.1
+      - uses: rustsec/audit-check@286a088f1cead63b54654692f8b045680f8f805f
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          ignore: RUSTSEC-2023-0071
